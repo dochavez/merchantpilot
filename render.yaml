@@ -1,0 +1,47 @@
+# Render Blueprint – one click deploy: https://render.com/deploy?repo=<your-github-repo-url>
+# Docs: https://render.com/docs/blueprint-spec
+services:
+  - type: web
+    name: merchantpilot
+    runtime: node
+    region: oregon
+    # "starter" never sleeps, so judges never hit a cold start. Covered by the hackathon's $50 Render credit.
+    # Use "free" while developing (sleeps after 15 min idle, ~1 min wake-up).
+    plan: starter
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NEXT_TELEMETRY_DISABLED
+        value: "1"
+      # --- PayPal sandbox (leave empty to run on built-in demo data)
+      - key: PAYPAL_CLIENT_ID
+        sync: false
+      - key: PAYPAL_CLIENT_SECRET
+        sync: false
+      - key: PAYPAL_WEBHOOK_ID
+        sync: false
+      - key: MERCHANT_NAME
+        value: Altura Coffee Supply (sandbox)
+      # Set to 1 to force demo data even when PayPal keys exist (recommended for the public judge URL
+      # if your sandbox has little activity).
+      - key: FORCE_DEMO
+        value: "0"
+      # --- AI model (one of the two)
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: LLM_MODEL
+        sync: false
+      # --- Abuse protection for the public demo
+      - key: LLM_TURNS_PER_10_MIN
+        value: "80"
+      - key: LLM_DAILY_TURN_CAP
+        value: "3000"
+      # --- AG Studio trial license (baked into the client bundle at build time)
+      - key: NEXT_PUBLIC_AG_STUDIO_LICENSE_KEY
+        sync: false
