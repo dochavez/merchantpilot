@@ -56,8 +56,10 @@ export async function proposeAction(input: ActionPayload & { rationale: string }
       if (!inv) throw new ActionValidationError(`No invoice ${input.data.invoiceId}`);
       if (!['SENT', 'UNPAID', 'PARTIALLY_PAID'].includes(inv.status))
         throw new ActionValidationError(`Invoice ${inv.invoiceNumber} is ${inv.status}; only unpaid invoices can be reminded`);
-      if (inv.lastReminderAt && Date.now() - Date.parse(inv.lastReminderAt) < 24 * 3_600_000)
-        throw new ActionValidationError(`A reminder for ${inv.invoiceNumber} was already sent at ${inv.lastReminderAt}; wait before reminding again`);
+      if (inv.lastReminderAt && Date.now() - Date.parse(inv.lastReminderAt) < 3 * 86_400_000)
+        throw new ActionValidationError(
+          `MerchantPilot policy: ${inv.invoiceNumber} already got a reminder at ${inv.lastReminderAt}. Duplicate reminders are blocked for 3 days to avoid spamming the customer (this is an app rule, not a PayPal limit).`,
+        );
       input.data.invoiceId = inv.invoiceId;
       title = `Send reminder for ${inv.invoiceNumber} to ${inv.recipientName} (${inv.amount.toFixed(2)} ${inv.currency}, ${inv.daysOverdue}d overdue)`;
       impact = { amount: inv.amount, currency: inv.currency };
