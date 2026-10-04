@@ -31,10 +31,10 @@ const PRODUCTS = [
 // Sandbox test card. Generate your own at developer.paypal.com → Testing tools → Credit card generator
 // and put it in SANDBOX_CARD_NUMBER / SANDBOX_CARD_EXPIRY (YYYY-MM). Requires card processing on the app.
 const TEST_CARD = {
-  number: process.env.SANDBOX_CARD_NUMBER ?? '4032035809742661',
-  expiry: process.env.SANDBOX_CARD_EXPIRY ?? '2030-12',
+  number: process.env.SANDBOX_CARD_NUMBER || '4032035809742661',
+  expiry: process.env.SANDBOX_CARD_EXPIRY || '2030-12',
   name: 'Sandbox Buyer',
-  security_code: process.env.SANDBOX_CARD_CVV ?? '123',
+  security_code: process.env.SANDBOX_CARD_CVV || '123',
 };
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));

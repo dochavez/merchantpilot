@@ -6,7 +6,7 @@
  * store in demo mode. Proposals are validated against real data before they are queued.
  */
 import { dataMode } from './config';
-import { getDataset, invalidateDataset } from './data';
+import { getDataset, invalidateDataset, markInvoiceReminded } from './data';
 import { demoAcceptDispute, demoInvoiceReminder, demoRefund } from './demo/store';
 import { runToolkitTool } from './paypal/toolkit';
 import type { ActionPayload, ProposedAction } from './types';
@@ -140,6 +140,7 @@ export async function decideAction(id: string, decision: 'approve' | 'reject'): 
               ...(action.data.note ? { note: action.data.note } : {}),
             })
           : demoInvoiceReminder(action.data.invoiceId);
+        if (live) markInvoiceReminded(action.data.invoiceId);
         break;
       case 'accept_dispute':
         result = live
