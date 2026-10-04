@@ -68,7 +68,11 @@ export async function runAgentTool(name: string, rawArgs: unknown): Promise<unkn
           (!args.status || (args.status === 'open' ? d.status !== 'RESOLVED' : d.status === args.status)) &&
           (!args.reason || d.reason === args.reason),
       );
-      return { total: rows.length, disputes: rows.slice(0, 50) };
+      return {
+        total: rows.length,
+        amountAtRisk: Math.round(rows.filter((d) => d.status !== 'RESOLVED').reduce((s, d) => s + d.amount, 0) * 100) / 100,
+        disputes: rows.slice(0, 50),
+      };
     }
     case 'paypal_get_dispute': {
       const ctx = disputeContext(ds, args.disputeId);
@@ -77,7 +81,22 @@ export async function runAgentTool(name: string, rawArgs: unknown): Promise<unkn
     }
     case 'paypal_list_invoices': {
       const rows = ds.invoices.filter((i) => (!args.overdueOnly || i.daysOverdue > 0) && (!args.status || i.status === args.status));
-      return { total: rows.length, invoices: rows };
+      const sum = (xs: typeof rows) => Math.round(xs.reduce((s, i) => s + i.amount, 0) * 100) / 100;
+      const byCustomer: Record<string, { invoices: number; amount: number }> = {};
+      for (const i of rows) {
+        const c = (byCustomer[i.recipientName || i.recipientEmail] ??= { invoices: 0, amount: 0 });
+        c.invoices++;
+        c.amount = Math.round((c.amount + i.amount) * 100) / 100;
+      }
+      return {
+        total: rows.length,
+        totalAmount: sum(rows),
+        overdueCount: rows.filter((i) => i.daysOverdue > 0).length,
+        overdueAmount: sum(rows.filter((i) => i.daysOverdue > 0)),
+        byCustomer,
+        note: 'Use these totals verbatim; do not add amounts yourself. Skip invoices with lastReminderAt in the last 3 days.',
+        invoices: rows,
+      };
     }
     case 'paypal_list_actions':
       return { actions: listActions().slice(0, 30) };

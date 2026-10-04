@@ -56,6 +56,8 @@ export async function proposeAction(input: ActionPayload & { rationale: string }
       if (!inv) throw new ActionValidationError(`No invoice ${input.data.invoiceId}`);
       if (!['SENT', 'UNPAID', 'PARTIALLY_PAID'].includes(inv.status))
         throw new ActionValidationError(`Invoice ${inv.invoiceNumber} is ${inv.status}; only unpaid invoices can be reminded`);
+      if (inv.lastReminderAt && Date.now() - Date.parse(inv.lastReminderAt) < 24 * 3_600_000)
+        throw new ActionValidationError(`A reminder for ${inv.invoiceNumber} was already sent at ${inv.lastReminderAt}; wait before reminding again`);
       input.data.invoiceId = inv.invoiceId;
       title = `Send reminder for ${inv.invoiceNumber} to ${inv.recipientName} (${inv.amount.toFixed(2)} ${inv.currency}, ${inv.daysOverdue}d overdue)`;
       impact = { amount: inv.amount, currency: inv.currency };
