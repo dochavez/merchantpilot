@@ -48,6 +48,7 @@ export async function* runTurn(req: AgLlmRequest, model: LanguageModel, signal?:
     toolChoice: conv.toolChoice as any,
     abortSignal: signal,
     maxRetries: 2,
+    maxOutputTokens: 2000,
     ...(req.responseFormat?.type === 'json'
       ? { output: Output.object({ schema: jsonSchema(req.responseFormat.schema as any), name: req.responseFormat.name, description: req.responseFormat.description }) }
       : {}),

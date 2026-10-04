@@ -80,6 +80,8 @@ export function createMockModel(): LanguageModel {
             : text('No overdue invoices.');
         } else if (r.toolName === 'propose_invoice_reminder') {
           parts = text('I queued the reminder in the Action Center – approve it there to execute.');
+        } else if (last.content.length > 1) {
+          parts = text('Health check: ' + last.content.map((c: any) => c.toolName).join(' + ') + ' done.');
         } else if (r.toolName === 'paypal_detect_anomalies') {
           const f = value?.findings ?? value?.result?.findings ?? [];
           parts = text('Top findings: ' + f.slice(0, 3).map((x: any) => x.title).join('; ') + '.');
@@ -88,6 +90,13 @@ export function createMockModel(): LanguageModel {
         }
       } else if (!toolNames.has('paypal_detect_anomalies')) {
         parts = text('(mock) Studio agent reply.');
+      } else if (userText.includes('health')) {
+        // Two tool calls in ONE turn (parallel), like real models do for a health check.
+        parts = [
+          { type: 'tool-call', toolCallId: 'mock_a' + Date.now(), toolName: 'paypal_overview', input: JSON.stringify({ periodDays: 30 }) },
+          { type: 'tool-call', toolCallId: 'mock_b' + Date.now(), toolName: 'paypal_detect_anomalies', input: '{}' },
+          { type: 'finish', usage, finishReason: { unified: 'tool-calls', raw: 'tool_calls' } },
+        ];
       } else if (userText.includes('invoice')) {
         parts = call('paypal_list_invoices', { overdueOnly: true });
       } else {
