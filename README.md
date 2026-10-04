@@ -70,7 +70,7 @@ With no keys, the app runs on demo data and the chat explains how to add a model
 | Command | What it does |
 |---|---|
 | `npm run check:env` | Live-checks PayPal OAuth, each PayPal API, the LLM and the AG Studio license |
-| `npm run seed:sandbox` | Creates payments, refunds and overdue invoices in your PayPal sandbox |
+| `npm run seed:sandbox` | Creates payments, refunds and overdue invoices in your PayPal sandbox (`-- --payments 100 --refunds 21 --no-invoices`) |
 | `npm test` | Unit tests: analytics, actions, LLM stream conversion, toolkit wiring |
 | `npm run e2e` | Browser test of the full agent → tool → Action Center → approve loop |
 | `npm run smoke -- <url>` | Post-deploy check of a hosted instance |

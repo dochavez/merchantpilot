@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import type { Dataset } from '@/lib/types';
 import ActionCenter from './ActionCenter';
+import { ACTION_EXECUTED_EVENT } from './studio/actions-client';
 import { clearSavedDashboard } from './studio/StudioDashboard';
 
 const StudioDashboard = dynamic(() => import('./studio/StudioDashboard'), {
@@ -32,6 +33,10 @@ export default function DashboardShell() {
 
   useEffect(() => {
     void Promise.resolve().then(() => load()); // async fetch; setState happens after await
+    // Approvals (from the Action Center or the chat cards) change PayPal data: reload it.
+    const onExecuted = () => void load(true);
+    window.addEventListener(ACTION_EXECUTED_EVENT, onExecuted);
+    return () => window.removeEventListener(ACTION_EXECUTED_EVENT, onExecuted);
   }, [load]);
 
   const resetDemo = async () => {
@@ -88,7 +93,7 @@ export default function DashboardShell() {
         </section>
         {showActions && (
           <div className="w-[320px] shrink-0 max-md:absolute max-md:inset-y-12 max-md:right-0 max-md:z-50 max-md:w-[90vw]">
-            <ActionCenter onExecuted={() => load(true)} />
+            <ActionCenter />
           </div>
         )}
       </main>

@@ -20,19 +20,69 @@ if (!config.paypal.baseUrl.includes('sandbox')) {
   process.exit(1);
 }
 
+// npm run seed:sandbox -- --payments 100 --refunds 21 [--no-invoices]
+// Tip: PayPal records each payment with TODAY's date (it cannot be back-dated). For nicer trend
+// charts run a smaller batch on several days, e.g. `npm run seed:sandbox -- --payments 15 --refunds 3 --no-invoices`.
+function arg(name: string, fallback: number) {
+  const i = process.argv.indexOf(`--${name}`);
+  const v = i >= 0 ? Number(process.argv[i + 1]) : NaN;
+  return Number.isFinite(v) && v >= 0 ? v : fallback;
+}
+const N_PAYMENTS = Math.min(arg('payments', 100), 300);
+const N_REFUNDS = Math.min(arg('refunds', Math.round(N_PAYMENTS * 0.21)), N_PAYMENTS);
+const WITH_INVOICES = !process.argv.includes('--no-invoices');
+
+// Same catalogue (and weights) as the demo dataset, so live and demo charts look alike.
 const PRODUCTS = [
-  ['Ceramic Pour-Over Kit', 64],
-  ['Burr Grinder Pro', 189],
-  ['Single-Origin Beans 1kg', 32],
-  ['Gooseneck Kettle', 79],
-  ['Cold Brew Tower', 149],
+  { name: 'Ceramic Pour-Over Kit', price: 64, weight: 14 },
+  { name: 'Burr Grinder Pro', price: 189, weight: 6 },
+  { name: 'Single-Origin Beans 1kg', price: 32, weight: 30 },
+  { name: 'Gooseneck Kettle', price: 79, weight: 10 },
+  { name: 'Espresso Tamper Set', price: 45, weight: 8 },
+  { name: 'Cold Brew Tower', price: 149, weight: 4 },
+  { name: 'Barista Course (online)', price: 120, weight: 5 },
+  { name: 'Paper Filters x200', price: 12, weight: 23 },
+];
+const BUYERS = ['Ana López', 'Carlos Pérez', 'Emily Carter', 'James Miller', 'Lucía Gómez', 'Sofía Herrera', 'Michael Brown', 'Diego Ramírez', 'Olivia Wilson', 'Mateo Castillo', 'Grace Lee', 'Valentina Ruiz'];
+const COUNTRIES = [
+  ['US', 'San Jose', 'CA', '95131', '2211 N First St'],
+  ['US', 'Austin', 'TX', '78701', '500 Congress Ave'],
+  ['MX', 'Ciudad de México', 'CMX', '06600', 'Av. Reforma 222'],
+  ['GT', 'Guatemala', 'GU', '01010', '6a Avenida 10-50'],
+  ['CA', 'Toronto', 'ON', 'M5V 2T6', '100 King St W'],
 ] as const;
+
+// Deterministic pseudo-random so two runs look alike but not identical between batches.
+let seed = Date.now() % 100_000;
+const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+function weighted<T extends { weight: number }>(xs: readonly T[]): T {
+  const total = xs.reduce((a, x) => a + x.weight, 0);
+  let r = rnd() * total;
+  for (const x of xs) if ((r -= x.weight) <= 0) return x;
+  return xs[xs.length - 1];
+}
+const pick = <T,>(xs: readonly T[]) => xs[Math.floor(rnd() * xs.length)];
+/** Card holder / shipping names: plain ASCII letters only (PayPal rejects accents in some fields). */
+const deaccent = (t: string) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+const ascii = (t: string) => deaccent(t).replace(/[^A-Za-z .'-]/g, '');
+let shippingSupported = true;
+
 
 // Sandbox test card. Generate your own at developer.paypal.com → Testing tools → Credit card generator
 // and put it in SANDBOX_CARD_NUMBER / SANDBOX_CARD_EXPIRY (YYYY-MM). Requires card processing on the app.
+/** PayPal wants YYYY-MM; the card generator shows MM/YYYY. Accept MM/YYYY, MM/YY, MM-YYYY or YYYY-MM. */
+function normalizeExpiry(raw: string): string {
+  const t = raw.trim();
+  let m = t.match(/^(\d{4})[-/](\d{1,2})$/);
+  if (m) return `${m[1]}-${m[2].padStart(2, '0')}`;
+  m = t.match(/^(\d{1,2})\s*[-/]\s*(\d{2}|\d{4})$/);
+  if (m) return `${m[2].length === 2 ? '20' + m[2] : m[2]}-${m[1].padStart(2, '0')}`;
+  return t;
+}
+
 const TEST_CARD = {
   number: process.env.SANDBOX_CARD_NUMBER || '4032035809742661',
-  expiry: process.env.SANDBOX_CARD_EXPIRY || '2030-12',
+  expiry: normalizeExpiry(process.env.SANDBOX_CARD_EXPIRY || '2030-12'),
   name: 'Sandbox Buyer',
   security_code: process.env.SANDBOX_CARD_CVV || '123',
 };
@@ -40,23 +90,40 @@ const TEST_CARD = {
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const rid = () => crypto.randomUUID();
 
-async function cardPayment(item: string, price: number, qty = 1) {
+async function cardPayment(item: string, price: number, qty = 1, buyer = 'Sandbox Buyer', country: readonly string[] = COUNTRIES[0]) {
   const value = (price * qty).toFixed(2);
-  const order = await paypalPost(
-    '/v2/checkout/orders',
-    {
-      intent: 'CAPTURE',
-      purchase_units: [
-        {
-          description: item,
-          amount: { currency_code: 'USD', value, breakdown: { item_total: { currency_code: 'USD', value } } },
-          items: [{ name: item, quantity: String(qty), unit_amount: { currency_code: 'USD', value: price.toFixed(2) }, category: 'PHYSICAL_GOODS' }],
-        },
-      ],
-      payment_source: { card: TEST_CARD },
-    },
-    { 'PayPal-Request-Id': rid(), Prefer: 'return=representation' },
-  );
+  const name = ascii(buyer) || 'Sandbox Buyer';
+  const body = (withShipping: boolean) => ({
+    intent: 'CAPTURE',
+    purchase_units: [
+      {
+        description: item,
+        amount: { currency_code: 'USD', value, breakdown: { item_total: { currency_code: 'USD', value } } },
+        items: [{ name: item, quantity: String(qty), unit_amount: { currency_code: 'USD', value: price.toFixed(2) }, category: 'PHYSICAL_GOODS' }],
+        ...(withShipping
+          ? {
+              shipping: {
+                name: { full_name: name },
+                address: { address_line_1: deaccent(country[4]), admin_area_2: deaccent(country[1]), admin_area_1: country[2], postal_code: country[3], country_code: country[0] },
+              },
+            }
+          : {}),
+      },
+    ],
+    payment_source: { card: { ...TEST_CARD, name } },
+  });
+  let order: any;
+  try {
+    order = await paypalPost('/v2/checkout/orders', body(shippingSupported), { 'PayPal-Request-Id': rid(), Prefer: 'return=representation' });
+  } catch (e) {
+    // Some sandbox apps reject the shipping block; fall back to the payload that always worked.
+    const msg = (e as Error).message;
+    // Only fall back when PayPal complains about the shipping block itself.
+    if (!shippingSupported || !/field=\/purchase_units\/\d+\/shipping/.test(msg)) throw e;
+    console.log(`\n  shipping details rejected (${msg.split('[')[1] ?? 'no detail'}); continuing without country data`);
+    shippingSupported = false;
+    order = await paypalPost('/v2/checkout/orders', body(false), { 'PayPal-Request-Id': rid(), Prefer: 'return=representation' });
+  }
   let capture = order.purchase_units?.[0]?.payments?.captures?.[0];
   if (!capture && order.status === 'APPROVED') {
     const cap = await paypalPost(`/v2/checkout/orders/${order.id}/capture`, {}, { 'PayPal-Request-Id': rid() });
@@ -98,29 +165,52 @@ async function invoice(recipient: { name: string; email: string }, amount: numbe
 async function main() {
   console.log('Seeding PayPal sandbox…\n');
 
-  let payments = 0;
-  let refunds = 0;
-  for (let i = 0; i < 24; i++) {
-    const [item, price] = PRODUCTS[i % PRODUCTS.length];
+  console.log(`Plan: ${N_PAYMENTS} payments, ${N_REFUNDS} refunds${WITH_INVOICES ? ', 3 invoices' : ''}`);
+  const captures: { id: string; item: string; price: number; qty: number }[] = [];
+  let failures = 0;
+  for (let i = 0; i < N_PAYMENTS; i++) {
+    const p = weighted(PRODUCTS);
+    const qty = p.price < 40 && rnd() < 0.4 ? 2 + Math.floor(rnd() * 3) : 1;
+    const country = rnd() < 0.6 ? COUNTRIES[Math.floor(rnd() * 2)] : pick(COUNTRIES);
     try {
-      const captureId = await cardPayment(item, price, item.includes('Beans') ? 2 : 1);
-      payments++;
-      // Pour-over kits get refunded (the "damaged batch" story); a few partial refunds elsewhere.
-      if (item.startsWith('Ceramic') || i % 9 === 0) {
-        await sleep(300);
-        await refund(captureId, item.startsWith('Ceramic') ? undefined : (price / 2).toFixed(2));
-        refunds++;
-      }
+      const id = await cardPayment(p.name, p.price, qty, pick(BUYERS), country);
+      captures.push({ id, item: p.name, price: p.price, qty });
       process.stdout.write('.');
     } catch (e) {
+      failures++;
       console.log(`\n  payment skipped: ${(e as Error).message}`);
-      if (payments === 0 && i >= 2) {
-        console.log('  → Card payments seem disabled on this sandbox app. Enable "Advanced Credit and Debit Card Payments" or create payments with a sandbox buyer (see docs).');
+      if (captures.length === 0 && failures >= 3) {
+        console.log('  → Stopping after 3 failed payments. Send the error above (with field=...) to fix it.');
         break;
       }
+      await sleep(1000);
     }
+    if (i % 10 === 9) await sleep(500); // be gentle with sandbox rate limits
   }
-  console.log(`\n✔ ${payments} payments, ${refunds} refunds`);
+  console.log(`\n✔ ${captures.length} payments`);
+
+  // Refunds tell the "damaged Pour-Over Kit batch" story: ~45% of the refunds are full refunds of
+  // pour-over kits, the rest are partial refunds spread over other products.
+  const kits = captures.filter((c) => c.item.startsWith('Ceramic'));
+  const others = captures.filter((c) => !c.item.startsWith('Ceramic'));
+  const kitRefunds = Math.min(kits.length, Math.round(N_REFUNDS * 0.45));
+  const plan = [...kits.slice(0, kitRefunds).map((c) => ({ c, full: true })), ...others.filter((_, i) => i % 3 === 0).slice(0, N_REFUNDS - kitRefunds).map((c) => ({ c, full: rnd() < 0.3 }))];
+  let refunds = 0;
+  for (const { c, full } of plan) {
+    try {
+      await refund(c.id, full ? undefined : ((c.price * c.qty) / 2).toFixed(2));
+      refunds++;
+      process.stdout.write('r');
+    } catch (e) {
+      console.log(`\n  refund skipped: ${(e as Error).message}`);
+    }
+    await sleep(300);
+  }
+  console.log(`\n✔ ${refunds} refunds (${Math.min(kitRefunds, refunds)} pour-over kits)`);
+  if (!WITH_INVOICES) {
+    console.log('\nNote: Transaction Search can take up to 3 hours to show new sandbox activity.');
+    return;
+  }
 
   const clients = [
     { name: 'Café Lumbre', email: 'sb-cafe-lumbre@example.com' },

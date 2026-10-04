@@ -61,6 +61,14 @@ npm run check:env
 npm run seed:sandbox
 ```
 
+   Por defecto crea 100 pagos, 21 reembolsos y 3 facturas. Puedes cambiar las cantidades:
+
+```bash
+npm run seed:sandbox -- --payments 15 --refunds 3 --no-invoices
+```
+
+   PayPal registra cada pago con la fecha de **hoy** (no se puede cambiar). Para que las gráficas de tendencia se vean bien, corre lotes pequeños en varios días distintos. Usa `--no-invoices` si ya creaste las facturas, para no duplicarlas.
+
    Si los pagos con tarjeta fallan, genera una tarjeta de prueba en **Testing tools → Credit card generator** y ponla en `SANDBOX_CARD_NUMBER`.
 
 > ⚠️ Las transacciones nuevas pueden tardar **hasta 3 horas** en aparecer en Transaction Search. Las facturas aparecen al instante.

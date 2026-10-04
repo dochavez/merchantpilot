@@ -77,7 +77,8 @@ export async function paypalPost<T = any>(path: string, payload: unknown, header
   const body = text ? JSON.parse(text) : {};
   if (!res.ok) {
     const msg = body?.message ?? body?.name ?? res.statusText;
-    const detail = Array.isArray(body?.details) && body.details[0] ? ` [${body.details[0].issue ?? ''}: ${body.details[0].description ?? ''}]` : '';
+    const d = Array.isArray(body?.details) ? body.details[0] : undefined;
+    const detail = d ? ` [${d.issue ?? ''}: ${d.description ?? ''}${d.field ? ` field=${d.field}` : ''}${d.value ? ` value=${d.value}` : ''}]` : '';
     throw new PayPalApiError(`PayPal POST ${path} failed (${res.status}): ${msg}${detail}`, res.status, body);
   }
   return body as T;

@@ -97,7 +97,7 @@ export function createMockModel(): LanguageModel {
             ? call('propose_invoice_reminder', { invoiceId: inv.invoiceId, note: 'Friendly reminder from Altura Coffee Supply.', rationale: `${inv.invoiceNumber} is ${inv.daysOverdue} days overdue.` })
             : text('No overdue invoices.');
         } else if (r.toolName === 'propose_invoice_reminder') {
-          parts = text('I queued the reminder in the Action Center – approve it there to execute.');
+          parts = text('I prepared the reminder. Nothing has been sent yet: approve or reject it on the card above (or in the Action Center).');
         } else if (last.content.length > 1) {
           parts = text('Health check: ' + last.content.map((c: any) => c.toolName).join(' + ') + ' done.');
         } else if (r.toolName === 'paypal_detect_anomalies') {
