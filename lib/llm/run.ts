@@ -31,7 +31,10 @@ export async function* runTurn(req: AgLlmRequest, model: LanguageModel, signal?:
   const turn = uid();
   const conv = convertRequest(req);
   const output: AgAiOutputItem[] = [];
-  const texts = new Map<string, { id: string; text: string }>();
+  // Text deltas are coalesced (~80 chars / 120 ms) so the browser re-renders the chat far less often.
+  const texts = new Map<string, { id: string; text: string; pending: string; last: number }>();
+  const FLUSH_CHARS = 80;
+  const FLUSH_MS = 120;
   const reasoning = new Map<string, { id: string; text: string }>();
   const toolStarted = new Set<string>();
   let usage: AgLlmResponse['usage'];
@@ -55,24 +58,30 @@ export async function* runTurn(req: AgLlmRequest, model: LanguageModel, signal?:
       switch (part.type) {
         case 'text-start': {
           const id = `${turn}-msg-${part.id}`;
-          texts.set(part.id, { id, text: '' });
+          texts.set(part.id, { id, text: '', pending: '', last: Date.now() });
           yield { type: 'TEXT_MESSAGE_START', messageId: id, role: 'assistant' };
           break;
         }
         case 'text-delta': {
           let t = texts.get(part.id);
           if (!t) {
-            t = { id: `${turn}-msg-${part.id}`, text: '' };
+            t = { id: `${turn}-msg-${part.id}`, text: '', pending: '', last: Date.now() };
             texts.set(part.id, t);
             yield { type: 'TEXT_MESSAGE_START', messageId: t.id, role: 'assistant' };
           }
           t.text += part.text;
-          yield { type: 'TEXT_MESSAGE_CONTENT', messageId: t.id, delta: part.text };
+          t.pending += part.text;
+          if (t.pending.length >= FLUSH_CHARS || Date.now() - t.last >= FLUSH_MS) {
+            yield { type: 'TEXT_MESSAGE_CONTENT', messageId: t.id, delta: t.pending };
+            t.pending = '';
+            t.last = Date.now();
+          }
           break;
         }
         case 'text-end': {
           const t = texts.get(part.id);
           if (t) {
+            if (t.pending) yield { type: 'TEXT_MESSAGE_CONTENT', messageId: t.id, delta: t.pending };
             yield { type: 'TEXT_MESSAGE_END', messageId: t.id };
             output.push({ id: t.id, kind: 'output', type: 'message', role: 'assistant', status: 'completed', content: [{ type: 'text', text: t.text, annotations: [] }] });
             texts.delete(part.id);
@@ -143,6 +152,7 @@ export async function* runTurn(req: AgLlmRequest, model: LanguageModel, signal?:
 
   // Close any text that never received text-end.
   for (const t of texts.values()) {
+    if (t.pending) yield { type: 'TEXT_MESSAGE_CONTENT', messageId: t.id, delta: t.pending };
     yield { type: 'TEXT_MESSAGE_END', messageId: t.id };
     output.push({ id: t.id, kind: 'output', type: 'message', role: 'assistant', status: 'completed', content: [{ type: 'text', text: t.text, annotations: [] }] });
   }

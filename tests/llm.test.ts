@@ -64,11 +64,32 @@ describe('runTurn', () => {
       },
     });
     const lines = await collect(runTurn(req(), model as any));
-    expect(lines.map((l) => l.type)).toEqual(['TEXT_MESSAGE_START', 'TEXT_MESSAGE_CONTENT', 'TEXT_MESSAGE_CONTENT', 'TEXT_MESSAGE_END', '__complete']);
+    // Small deltas are coalesced into one UI update.
+    expect(lines.map((l) => l.type)).toEqual(['TEXT_MESSAGE_START', 'TEXT_MESSAGE_CONTENT', 'TEXT_MESSAGE_END', '__complete']);
+    expect((lines[1] as any).delta).toBe('Refunds spiked.');
     const done = lines.at(-1) as any;
     expect(done.response.status).toBe('completed');
     expect(done.response.output[0].content[0].text).toBe('Refunds spiked.');
     expect(done.response.usage).toMatchObject({ inputTokens: 10, outputTokens: 5 });
+  });
+
+  it('chunks long streams instead of one event per token', async () => {
+    const words = Array.from({ length: 60 }, (_, i) => `word${i} `);
+    const model = new MockLanguageModelV4({
+      doStream: {
+        stream: convertArrayToReadableStream([
+          { type: 'text-start', id: 't1' },
+          ...words.map((w) => ({ type: 'text-delta' as const, id: 't1', delta: w })),
+          { type: 'text-end', id: 't1' },
+          { type: 'finish', usage, finishReason: { unified: 'stop', raw: 'stop' } },
+        ]),
+      },
+    });
+    const lines = await collect(runTurn(req(), model as any));
+    const contents = lines.filter((l) => l.type === 'TEXT_MESSAGE_CONTENT') as any[];
+    expect(contents.length).toBeGreaterThan(1);
+    expect(contents.length).toBeLessThan(words.length / 3);
+    expect(contents.map((c) => c.delta).join('')).toBe(words.join(''));
   });
 
   it('streams tool calls without executing them', async () => {

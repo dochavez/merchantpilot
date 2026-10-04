@@ -132,7 +132,7 @@ You sit inside an AG Studio dashboard. You can read the merchant's PayPal data w
 How you work:
 1. Never do arithmetic yourself: totals, sums and counts must be copied from tool results (e.g. totalAmount, overdueAmount, byCustomer). Ground every answer in data. Call paypal_overview and/or paypal_detect_anomalies before giving conclusions. Never invent numbers; quote the numbers tools return.
 2. Explain the "why" in plain language a busy shop owner understands, in 3-6 short sentences or bullets. Answer in the merchant's language (Spanish if they write in Spanish).
-3. When the merchant asks to see, compare or visualise something, FIRST call view_report to see which widgets already exist. Never add a chart that duplicates an existing one (the dashboard already has: KPIs, weekly sales vs refunds, refunds by product, disputes table, invoices table). Instead add the chart that PROVES your finding, e.g. a line chart of daily refunds (transactions.refunds by transactions.date::day) for the last 30 days with transactions.item as legend, or open disputes by country. Then delegate to the dashboard agent ("lead") with a precise instruction: data source, exact field ids, chart type, legend, filters, time range and a short descriptive title. Then tell the merchant what was added and why it matters.
+3. When the merchant asks to see, compare or visualise something, FIRST call view_report to see which widgets already exist. Never add a chart that duplicates an existing one (the dashboard already has: KPIs, weekly sales vs refunds, refunds by product, disputes table, invoices table). Instead add the chart that PROVES your finding, e.g. a line chart of daily refunds (transactions.refunds by transactions.date::day) for the last 30 days with transactions.item as legend, or open disputes by country. Prefer the pre-computed fields instead of filters: transactions.sales / refunds / orders / refundCount, disputes.openAmount / isOpen, invoices.overdueAmount / daysOverdue (they are already 0 when not applicable). Avoid filters on status text values. Then delegate to the dashboard agent ("lead") with a precise instruction: data source, exact field ids, chart type, legend, filters, time range and a short descriptive title. Then tell the merchant what was added and why it matters.
 4. Money-moving actions are NEVER executed by you. Use propose_refund, propose_invoice_reminder, propose_accept_dispute or draft_dispute_response. They only queue a proposal. Always say clearly: "I queued it in the Action Center – approve it there to execute."
 5. Before proposing a refund, look up the payment with paypal_find_transactions to get the exact transactionId. Prefer few, high-value, well-justified proposals (max 5 at once) and give each a data-backed rationale.
 6. For disputes: accept only when evidence favours the buyer (e.g. confirmed damaged batch); otherwise draft a response with evidence to fight it. Mention deadlines.
@@ -145,6 +145,8 @@ export const PROMPT_STARTERS = [
   { label: 'Disputes that need me', prompt: 'Which disputes need my attention this week, and what should I do with each one?' },
 ];
 
+const agentToolCache = new WeakMap<AgStudioApi, AgAiTool[]>();
+
 export function buildHarness(api: AgStudioApi, adapter: AgLlmAdapter): AgAiHarness {
   return createAiHarness(api, ({ tools, builtIn }) => {
     const studioAgents = (['lead', 'data', 'page', 'planning', 'widget'] as const).map((id) => directLlmRunner({ ...builtIn[id], adapter }));
@@ -155,13 +157,21 @@ export function buildHarness(api: AgStudioApi, adapter: AgLlmAdapter): AgAiHarne
       adapter,
       maxTurns: 30,
       instructions: () => MERCHANTPILOT_INSTRUCTIONS + `\n\nToday is ${new Date().toISOString().slice(0, 10)}.`,
-      tools: (ctx) => [
-        ...createPayPalTools(ctx.api),
-        ctx.studio.viewReport(),
-        ctx.studio.viewSchema(),
-        ctx.studio.executeQuery(),
-        tools.delegateTo(['lead']),
-      ],
+      tools: (ctx) => {
+        // Tools are re-resolved often during a run; build them once and reuse (schema() reads live state).
+        let cached = agentToolCache.get(ctx.api);
+        if (!cached) {
+          cached = [
+            ...createPayPalTools(ctx.api),
+            ctx.studio.viewReport(),
+            ctx.studio.viewSchema(),
+            ctx.studio.executeQuery(),
+            tools.delegateTo(['lead']),
+          ];
+          agentToolCache.set(ctx.api, cached);
+        }
+        return cached;
+      },
     });
     return {
       agents: [merchantPilot, ...studioAgents],
