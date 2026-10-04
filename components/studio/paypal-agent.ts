@@ -136,7 +136,8 @@ How you work:
 4. Money-moving actions are NEVER executed by you. Use propose_refund, propose_invoice_reminder, propose_accept_dispute or draft_dispute_response. They only queue a proposal. Always say clearly: "I queued it in the Action Center – approve it there to execute."
 5. Before proposing a refund, look up the payment with paypal_find_transactions to get the exact transactionId. Prefer few, high-value, well-justified proposals (max 5 at once) and give each a data-backed rationale.
 6. For disputes: accept only when evidence favours the buyer (e.g. confirmed damaged batch); otherwise draft a response with evidence to fight it. Mention deadlines.
-7. Be concise. End with 1-3 suggested next steps.`;
+7. Be concise. End with 1-3 suggested next steps.
+8. Formatting: plain sentences, **bold** labels and simple bullet lists. Do not use markdown headings (lines starting with #) or tables.`;
 
 export const PROMPT_STARTERS = [
   { label: 'What changed this month?', prompt: 'Give me a quick health check of my PayPal business for the last 30 days and tell me the 3 things I should worry about.' },

@@ -120,3 +120,40 @@ describe('runTurn', () => {
     expect(done.response.error.message).toMatch(/boom/);
   });
 });
+
+describe('markdown-safe streaming', () => {
+  it('never emits a partial "#" line and turns headings into bold', async () => {
+    const { LineSafeFilter, sanitizeMarkdown } = await import('@/lib/llm/markdown-safe');
+    const text = '## 🔴 Your 30-Day Health Check\n\n**Main issue:** cash.\n#1 risk: invoices\n  ### Next\n- a\n##';
+    for (const size of [1, 2, 3, 7]) {
+      const f = new LineSafeFilter();
+      let emitted = '';
+      for (let i = 0; i < text.length; i += size) {
+        emitted += f.push(text.slice(i, i + size));
+        // every prefix the browser could render must be free of lines starting with "#"
+        expect(emitted.split('\n').some((l) => l.trim().startsWith('#'))).toBe(false);
+      }
+      emitted += f.end();
+      expect(emitted).toBe(sanitizeMarkdown(text));
+    }
+    expect(sanitizeMarkdown(text)).toBe('**🔴 Your 30-Day Health Check**\n\n**Main issue:** cash.\n​#1 risk: invoices\n**Next**\n- a\n');
+  });
+
+  it('runTurn output is sanitized for streamed headings', async () => {
+    const model = new MockLanguageModelV4({
+      doStream: {
+        stream: convertArrayToReadableStream([
+          { type: 'text-start', id: 't1' },
+          { type: 'text-delta', id: 't1', delta: 'Intro\n\n##' },
+          { type: 'text-delta', id: 't1', delta: ' Title\nBody' },
+          { type: 'text-end', id: 't1' },
+          { type: 'finish', usage, finishReason: { unified: 'stop', raw: 'stop' } },
+        ]),
+      },
+    });
+    const lines = await collect(runTurn(req(), model as any));
+    const deltas = (lines.filter((l) => l.type === 'TEXT_MESSAGE_CONTENT') as any[]).map((l) => l.delta).join('');
+    expect(deltas).toBe('Intro\n\n**Title**\nBody');
+    expect((lines.at(-1) as any).response.output[0].content[0].text).toBe('Intro\n\n**Title**\nBody');
+  });
+});

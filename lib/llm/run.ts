@@ -12,6 +12,7 @@ import type { AgAiEvent, AgAiOutputItem, AgLlmRequest, AgLlmResponse } from 'ag-
 import { config, llmModelId, llmProvider } from '../config';
 import { convertRequest } from './convert';
 import { createMockModel } from './mock';
+import { LineSafeFilter } from './markdown-safe';
 
 export type WireLine = AgAiEvent | { type: '__complete'; response: AgLlmResponse };
 
@@ -32,7 +33,7 @@ export async function* runTurn(req: AgLlmRequest, model: LanguageModel, signal?:
   const conv = convertRequest(req);
   const output: AgAiOutputItem[] = [];
   // Text deltas are coalesced (~80 chars / 120 ms) so the browser re-renders the chat far less often.
-  const texts = new Map<string, { id: string; text: string; pending: string; last: number }>();
+  const texts = new Map<string, { id: string; text: string; pending: string; last: number; safe: LineSafeFilter }>();
   const FLUSH_CHARS = 80;
   const FLUSH_MS = 120;
   const reasoning = new Map<string, { id: string; text: string }>();
@@ -59,20 +60,22 @@ export async function* runTurn(req: AgLlmRequest, model: LanguageModel, signal?:
       switch (part.type) {
         case 'text-start': {
           const id = `${turn}-msg-${part.id}`;
-          texts.set(part.id, { id, text: '', pending: '', last: Date.now() });
+          texts.set(part.id, { id, text: '', pending: '', last: Date.now(), safe: new LineSafeFilter() });
           yield { type: 'TEXT_MESSAGE_START', messageId: id, role: 'assistant' };
           break;
         }
         case 'text-delta': {
           let t = texts.get(part.id);
           if (!t) {
-            t = { id: `${turn}-msg-${part.id}`, text: '', pending: '', last: Date.now() };
+            t = { id: `${turn}-msg-${part.id}`, text: '', pending: '', last: Date.now(), safe: new LineSafeFilter() };
             texts.set(part.id, t);
             yield { type: 'TEXT_MESSAGE_START', messageId: t.id, role: 'assistant' };
           }
-          t.text += part.text;
-          t.pending += part.text;
-          if (t.pending.length >= FLUSH_CHARS || Date.now() - t.last >= FLUSH_MS) {
+          // Markdown-safe text only (see markdown-safe.ts: AG Studio's renderer hangs on partial "#" lines).
+          const safe = t.safe.push(part.text);
+          t.text += safe;
+          t.pending += safe;
+          if (t.pending && (t.pending.length >= FLUSH_CHARS || Date.now() - t.last >= FLUSH_MS)) {
             yield { type: 'TEXT_MESSAGE_CONTENT', messageId: t.id, delta: t.pending };
             t.pending = '';
             t.last = Date.now();
@@ -82,6 +85,9 @@ export async function* runTurn(req: AgLlmRequest, model: LanguageModel, signal?:
         case 'text-end': {
           const t = texts.get(part.id);
           if (t) {
+            const tail = t.safe.end();
+            t.text += tail;
+            t.pending += tail;
             if (t.pending) yield { type: 'TEXT_MESSAGE_CONTENT', messageId: t.id, delta: t.pending };
             yield { type: 'TEXT_MESSAGE_END', messageId: t.id };
             output.push({ id: t.id, kind: 'output', type: 'message', role: 'assistant', status: 'completed', content: [{ type: 'text', text: t.text, annotations: [] }] });
@@ -153,6 +159,9 @@ export async function* runTurn(req: AgLlmRequest, model: LanguageModel, signal?:
 
   // Close any text that never received text-end.
   for (const t of texts.values()) {
+    const tail = t.safe.end();
+    t.text += tail;
+    t.pending += tail;
     if (t.pending) yield { type: 'TEXT_MESSAGE_CONTENT', messageId: t.id, delta: t.pending };
     yield { type: 'TEXT_MESSAGE_END', messageId: t.id };
     output.push({ id: t.id, kind: 'output', type: 'message', role: 'assistant', status: 'completed', content: [{ type: 'text', text: t.text, annotations: [] }] });

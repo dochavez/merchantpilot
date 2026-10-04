@@ -8,10 +8,25 @@ import type { LanguageModel } from 'ai';
 type Part = Record<string, any>;
 
 function streamOf(parts: Part[]) {
+  const delay = Number(process.env.MOCK_STREAM_MS || 0);
+  if (!delay) {
+    return new ReadableStream({
+      start(c) {
+        for (const p of parts) c.enqueue(p);
+        c.close();
+      },
+    });
+  }
+  // Optional token-like streaming (MOCK_STREAM_MS) to reproduce how real models stream text.
+  const expanded: Part[] = parts.flatMap((p) =>
+    p.type === 'text-delta' ? (String(p.delta).match(/\S+\s*|\s+/g) ?? []).map((d) => ({ ...p, delta: d })) : [p],
+  );
+  let i = 0;
   return new ReadableStream({
-    start(c) {
-      for (const p of parts) c.enqueue(p);
-      c.close();
+    async pull(c) {
+      if (i >= expanded.length) return c.close();
+      await new Promise((r) => setTimeout(r, delay));
+      c.enqueue(expanded[i++]);
     },
   });
 }
@@ -73,7 +88,10 @@ export function createMockModel(): LanguageModel {
         const r = last.content[0];
         const value = resultValue(r);
         if (process.env.MOCK_DEBUG) console.log('[mock] tool result', JSON.stringify(r).slice(0, 600));
-        if (r.toolName === 'paypal_list_invoices' && toolNames.has('propose_invoice_reminder')) {
+        if (process.env.MOCK_FINAL_TEXT && userText.includes('health')) {
+          // Lets tests replay a real model's final answer (e.g. rich markdown) through the UI.
+          parts = text(process.env.MOCK_FINAL_TEXT);
+        } else if (r.toolName === 'paypal_list_invoices' && toolNames.has('propose_invoice_reminder')) {
           const inv = value?.result?.invoices?.[0] ?? value?.invoices?.[0];
           parts = inv
             ? call('propose_invoice_reminder', { invoiceId: inv.invoiceId, note: 'Friendly reminder from Altura Coffee Supply.', rationale: `${inv.invoiceNumber} is ${inv.daysOverdue} days overdue.` })
