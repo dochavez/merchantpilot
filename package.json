@@ -17,7 +17,8 @@
     "check:env": "tsx scripts/check-env.ts",
     "seed:sandbox": "tsx scripts/seed-sandbox.ts",
     "smoke": "tsx scripts/smoke.ts",
-    "e2e": "node tests/e2e/agent-flow.mjs"
+    "e2e": "node tests/e2e/agent-flow.mjs",
+    "e2e:exports": "node tests/e2e/exports.mjs"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^4.0.71",
@@ -27,7 +28,9 @@
     "ag-studio": "3.0.0",
     "ag-studio-react": "3.0.0",
     "ai": "^7.0.127",
+    "exceljs": "^4.4.0",
     "next": "16.3.6",
+    "pdfkit": "^0.17.2",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "zod": "^3.25.76"
@@ -35,6 +38,7 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^22",
+    "@types/pdfkit": "^0.17.6",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",

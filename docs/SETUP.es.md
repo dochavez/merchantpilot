@@ -150,3 +150,11 @@ npm run smoke -- https://merchantpilot.onrender.com
 - [ ] Descripción: problema, usuario, cómo se usa PayPal, cómo se usa la IA, patrocinadores usados
 - [ ] Elegir premios: Best Use of AG Grid, Best Use of PayPal + AI, Most Impactful
 - [ ] Credenciales de prueba para los jueces, si hacen falta (en modo demo no se necesitan)
+
+## Exportar a Excel, PDF y conectar Power BI
+
+- En el dashboard, botón **Export**: reporte ejecutivo en PDF (con resumen escrito por la IA, en inglés o español), libro de Excel con todas las tablas, CSV por tabla y **Connect Power BI / Excel**.
+- También se puede pedir en el chat: *"Hazme el reporte PDF de este mes"* y aparece una tarjeta con el botón de descarga.
+- **Power BI Desktop:** descarga el archivo `.pbids` desde el diálogo y ábrelo con doble clic; Power BI se conecta solo. O bien: *Obtener datos → Fuente OData* → pega `https://TU-APP.onrender.com/api/odata` → elige las tablas → *Cargar*.
+- **Excel (Microsoft 365):** *Datos → Obtener datos → Desde otras fuentes → Desde fuente OData* → pega la misma URL. Con *Actualizar todo* se vuelven a leer los datos de PayPal.
+- **Seguridad:** si defines `EXPORT_API_KEY` en Render, Power BI y Excel deben usar autenticación **Básica**: cualquier usuario y la clave como contraseña.

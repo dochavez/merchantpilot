@@ -5,9 +5,12 @@
 import type { AgAiToolDisplay } from 'ag-studio-react';
 import type { AgAiToolLabelParams } from 'ag-studio';
 import ProposalCard from './ProposalCard';
+import ReportCard from './ReportCard';
 
-/** Rows whose text starts with this are auto-expanded by StudioDashboard so the card is visible. */
+/** Rows whose text starts with one of these are auto-expanded by StudioDashboard so the card is visible. */
 export const PROPOSAL_LABEL_PREFIX = 'Proposal:';
+export const REPORT_LABEL_PREFIX = 'Report ready:';
+export const AUTO_OPEN_PREFIXES = [PROPOSAL_LABEL_PREFIX, REPORT_LABEL_PREFIX];
 
 const running = (p: AgAiToolLabelParams) => p.status !== 'done' && p.status !== 'cancelled';
 
@@ -35,7 +38,14 @@ const simple = (doing: string, done: string, pill?: (args: any) => string | unde
   label: (p) => ({ text: running(p) ? doing : done, pill: pill?.(p.args) }),
 });
 
+const REPORT_NAMES: Record<string, string> = { pdf: 'PDF executive report', xlsx: 'Excel workbook', csv: 'CSV table', powerbi: 'Power BI / Excel live feed' };
+
 export const TOOL_DISPLAY: Record<string, AgAiToolDisplay> = {
+  create_report: {
+    label: (p) =>
+      running(p) ? { text: 'Preparing report…' } : { text: `${REPORT_LABEL_PREFIX} ${REPORT_NAMES[String((p.args as any)?.format ?? 'pdf')] ?? 'report'}`, pill: 'Download' },
+    detail: ReportCard,
+  },
   paypal_overview: simple('Reading PayPal KPIs…', 'Read PayPal KPIs', (a) => (a?.periodDays ? `${a.periodDays} days` : undefined)),
   paypal_detect_anomalies: simple('Scanning for anomalies…', 'Scanned for anomalies'),
   paypal_find_transactions: simple('Searching transactions…', 'Searched transactions', (a) => a?.item ?? a?.customerEmail),

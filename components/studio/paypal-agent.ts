@@ -59,7 +59,35 @@ function buildPayPalTools(api: AgStudioApi): AgAiTool[] {
       },
     } as any);
 
+  const createReport: AgAiTool = api.defineAiTool({
+    name: 'create_report',
+    description:
+      'Prepare a downloadable report for the merchant: "pdf" (executive report with charts and an AI summary), "xlsx" (Excel workbook with all data as tables), "csv" (one table) or "powerbi" (live connection for Power BI / Excel). Returns a link; a download card appears in the chat.',
+    params: (s: any) =>
+      s.object({
+        format: s.enum(['pdf', 'xlsx', 'csv', 'powerbi']),
+        periodDays: s.number({ description: 'Look-back window for KPIs (7-90). Default 30.' }).optional(),
+        language: s.enum(['en', 'es']).optional(),
+        table: s.enum(['Transactions', 'Disputes', 'Invoices', 'Products', 'Countries', 'WeeklyTrend', 'Findings', 'Actions']).optional(),
+      }),
+    async execute(args: any, ctx: any) {
+      const days = Math.min(90, Math.max(7, Math.round(args?.periodDays ?? 30)));
+      const lang = args?.language === 'es' ? 'es' : 'en';
+      const format = args?.format ?? 'pdf';
+      const url =
+        format === 'pdf'
+          ? `/api/export/pdf?days=${days}&lang=${lang}`
+          : format === 'xlsx'
+            ? `/api/export/xlsx?days=${days}`
+            : format === 'csv'
+              ? `/api/export/csv/${args?.table ?? 'Transactions'}?days=${days}`
+              : '/api/odata';
+      return ctx.success(JSON.stringify({ format, url, periodDays: days, note: 'A download card is shown to the merchant under your message. Do not paste the link.' }));
+    },
+  } as any);
+
   return [
+    createReport,
     define('paypal_overview', 'KPIs for the merchant: sales, orders, refunds and refund rate (vs previous period), fees, net revenue, open disputes, overdue invoices. Call this first to ground any answer.', (s) =>
       s.object({ periodDays: s.number({ description: 'Look-back window in days (1-90). Default 30.' }).optional() }),
     ),
@@ -136,8 +164,9 @@ How you work:
 4. Money-moving actions are NEVER executed by you. Use propose_refund, propose_invoice_reminder, propose_accept_dispute or draft_dispute_response. They only queue a proposal. Each proposal appears as a card with Approve/Reject buttons right under your message (and in the Action Center). Say clearly that nothing has happened yet and the merchant can approve or reject it on the card. Do not repeat the card's details at length.
 5. Before proposing a refund, look up the payment with paypal_find_transactions to get the exact transactionId. Prefer few, high-value, well-justified proposals (max 5 at once) and give each a data-backed rationale.
 6. For disputes: accept only when evidence favours the buyer (e.g. confirmed damaged batch); otherwise draft a response with evidence to fight it. Mention deadlines.
-7. Be concise. End with 1-3 suggested next steps.
-8. Formatting: plain sentences, **bold** labels and simple bullet lists. Do not use markdown headings (lines starting with #) or tables.`;
+7. Reports: when the merchant wants a report, a file, Excel, PDF, CSV or Power BI, call create_report (pdf by default; use language 'es' if they write in Spanish). A download card appears under your message.
+8. Be concise. End with 1-3 suggested next steps.
+9. Formatting: plain sentences, **bold** labels and simple bullet lists. Do not use markdown headings (lines starting with #) or tables.`;
 
 export const PROMPT_STARTERS = [
   { label: 'What changed this month?', prompt: 'Give me a quick health check of my PayPal business for the last 30 days and tell me the 3 things I should worry about.' },

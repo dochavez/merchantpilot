@@ -18,7 +18,8 @@ Small merchants live inside PayPal but can't see *why* their money moves. Refund
 
 1. **Ask** – "Why are my refunds up?" MerchantPilot reads transactions, disputes and invoices and runs deterministic anomaly detection. It finds, for example, that 54% of *Ceramic Pour-Over Kit* orders were refunded in the last 10 days, versus 2% before.
 2. **See** – it delegates to **AG Studio's built-in agents**, which add the chart that proves the finding to the dashboard.
-3. **Approve** – it *proposes* actions such as refunding the affected buyers, reminding the café whose invoice is 34 days late, or accepting a lost-package dispute. Proposals land in the **Action Center**. Nothing moves money until the merchant clicks *Approve*. Approved actions then execute through the **PayPal Agent Toolkit**.
+3. **Approve** – it *proposes* actions such as refunding the affected buyers, reminding the café whose invoice is 34 days late, or accepting a lost-package dispute. Each proposal appears as a card with **Approve / Reject right inside the chat** (and in the **Action Center**). Nothing moves money until the merchant clicks *Approve*. Approved actions then execute through the **PayPal Agent Toolkit**.
+4. **Share** – one click (or one sentence in the chat: *"send me this month's report"*) produces an **executive PDF** with an AI-written summary, an **Excel workbook** with every table ready for pivots, CSVs, or a **live OData feed for Power BI and Excel** that refreshes from PayPal.
 
 ## Architecture
 
@@ -75,6 +76,18 @@ With no keys, the app runs on demo data and the chat explains how to add a model
 | `npm run e2e` | Browser test of the full agent → tool → Action Center → approve loop |
 | `npm run smoke -- <url>` | Post-deploy check of a hosted instance |
 
+## Exports & BI
+
+| Output | Endpoint | Notes |
+|---|---|---|
+| Executive PDF | `/api/export/pdf?days=30&lang=en` | KPIs, charts, priorities, audit trail. Summary written by the LLM from the same numbers (deterministic fallback). |
+| Excel workbook | `/api/export/xlsx?days=30` | Summary + 9 sheets as native Excel tables, currency formats, data bars, deadline highlighting. |
+| CSV | `/api/export/csv/{Transactions,Disputes,Invoices,Products,Countries,WeeklyTrend,Findings,Actions}` | UTF-8 with BOM (opens correctly in Excel). |
+| OData v4 feed | `/api/odata` (`$metadata`, `$select`, `$top`, `$skip`, `$count`) | Power BI → *Get data → OData feed*; Excel → *Data → From OData Feed*. Refreshable. |
+| Power BI file | `/api/export/pbids` | Double-click to open Power BI Desktop already connected. |
+
+Set `EXPORT_API_KEY` to protect the feed: Power BI / Excel then use **Basic** auth (any user, the key as password); scripts can pass `?key=` or a Bearer token. Downloads started from the app itself keep working.
+
 ## Deploy (Render)
 
 `render.yaml` is a Render Blueprint. Click **New → Blueprint**, select this repo, fill in the secret env vars, and deploy. The health check is at `/api/health`. Set `NEXT_PUBLIC_AG_STUDIO_LICENSE_KEY` **before** building, because it is baked into the client bundle.
@@ -83,8 +96,9 @@ With no keys, the app runs on demo data and the chat explains how to add a model
 
 1. Open `/dashboard` and use the **AI Assistant** panel.
 2. Click **"Why are refunds up?"**, then **"Chase overdue invoices"**.
-3. Approve a proposal in the **Action Center** and watch the dashboard update.
-4. Click **Reset demo** to start over.
+3. Approve a proposal **on its card in the chat** (or in the Action Center) and watch the dashboard update.
+4. Ask *"Make me a PDF report of this month"* or use **Export** → PDF / Excel / Power BI.
+5. Click **Reset demo** to start over.
 
 ## License
 

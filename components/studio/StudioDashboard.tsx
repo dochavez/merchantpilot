@@ -13,7 +13,7 @@ import { createServerLlmAdapter } from './llm-adapter';
 import { buildHarness } from './paypal-agent';
 import { toStudioData } from './data-sources';
 import { INITIAL_REPORT } from './initial-report';
-import { PROPOSAL_LABEL_PREFIX, TOOL_DISPLAY } from './tool-display';
+import { AUTO_OPEN_PREFIXES, TOOL_DISPLAY } from './tool-display';
 
 const licenseKey = process.env.NEXT_PUBLIC_AG_STUDIO_LICENSE_KEY;
 if (licenseKey) AgStudioLicenseManager.setLicenseKey(licenseKey);
@@ -58,7 +58,7 @@ export default function StudioDashboard({ dataset, onApi }: StudioDashboardProps
     if (process.env.NODE_ENV !== 'production' && apiRef.current) (window as any).__studioApi = apiRef.current;
   });
 
-  // Studio collapses tool rows by default; open each proposal row once so its Approve/Reject card
+  // Studio collapses tool rows by default; open each proposal / report row once so its Approve/Reject card
   // shows without an extra click (the merchant can still collapse it).
   const hostRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
@@ -69,7 +69,7 @@ export default function StudioDashboard({ dataset, onApi }: StudioDashboardProps
       host.querySelectorAll('.ag-studio-ai-step-row-interactive:not(.ag-studio-ai-step-row-open)').forEach((row) => {
         if (opened.has(row)) return;
         const text = row.querySelector('.ag-studio-ai-step-text')?.textContent ?? '';
-        if (!text.startsWith(PROPOSAL_LABEL_PREFIX)) return;
+        if (!AUTO_OPEN_PREFIXES.some((p) => text.startsWith(p))) return;
         opened.add(row);
         (row as HTMLElement).click();
       });

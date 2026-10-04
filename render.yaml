@@ -45,6 +45,9 @@ services:
         value: "30"
       - key: LLM_DAILY_TURN_CAP
         value: "200"
+      # --- Optional: protects the Power BI / Excel OData feed (/api/odata) and export URLs
+      - key: EXPORT_API_KEY
+        sync: false
       # --- AG Studio trial license (baked into the client bundle at build time)
       - key: NEXT_PUBLIC_AG_STUDIO_LICENSE_KEY
         sync: false

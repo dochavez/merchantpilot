@@ -96,6 +96,8 @@ export function createMockModel(): LanguageModel {
           parts = inv
             ? call('propose_invoice_reminder', { invoiceId: inv.invoiceId, note: 'Friendly reminder from Altura Coffee Supply.', rationale: `${inv.invoiceNumber} is ${inv.daysOverdue} days overdue.` })
             : text('No overdue invoices.');
+        } else if (r.toolName === 'create_report') {
+          parts = text('Your report is ready – use the download card above.');
         } else if (r.toolName === 'propose_invoice_reminder') {
           parts = text('I prepared the reminder. Nothing has been sent yet: approve or reject it on the card above (or in the Action Center).');
         } else if (last.content.length > 1) {
@@ -115,6 +117,8 @@ export function createMockModel(): LanguageModel {
           { type: 'tool-call', toolCallId: 'mock_b' + Date.now(), toolName: 'paypal_detect_anomalies', input: '{}' },
           { type: 'finish', usage, finishReason: { unified: 'tool-calls', raw: 'tool_calls' } },
         ];
+      } else if (userText.includes('report') && toolNames.has('create_report')) {
+        parts = call('create_report', { format: userText.includes('excel') ? 'xlsx' : userText.includes('power bi') ? 'powerbi' : 'pdf' });
       } else if (userText.includes('invoice')) {
         parts = call('paypal_list_invoices', { overdueOnly: true });
       } else {
