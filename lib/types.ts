@@ -51,6 +51,8 @@ export interface DisputeRow {
   customerEmail: string;
   item: string;
   outcome?: string;
+  /** Set when MerchantPilot submitted evidence for this dispute. */
+  evidenceSubmittedAt?: string;
 }
 
 export type InvoiceStatus =
@@ -78,6 +80,8 @@ export interface InvoiceRow {
   dueDate: string;
   daysOverdue: number;
   lastReminderAt?: string;
+  /** Installment plan offered through PayPal partial payments. */
+  paymentPlan?: { installments: number; minimumAmountDue: number; offeredAt: string };
 }
 
 export interface Dataset {
@@ -94,7 +98,7 @@ export interface Dataset {
 
 /* ------------------------------------------------------------------ actions (human in the loop) */
 
-export type ActionKind = 'refund' | 'invoice_reminder' | 'accept_dispute' | 'dispute_response_draft';
+export type ActionKind = 'refund' | 'invoice_reminder' | 'accept_dispute' | 'dispute_response_draft' | 'submit_dispute_evidence' | 'payment_plan';
 export type ActionStatus = 'pending' | 'approved' | 'executed' | 'rejected' | 'failed';
 
 export interface RefundPayload {
@@ -118,11 +122,28 @@ export interface DisputeResponseDraftPayload {
   evidence: string[];
 }
 
+export interface SubmitDisputeEvidencePayload {
+  disputeId: string;
+  /** Seller statement sent to PayPal / the buyer. */
+  message: string;
+  /** Evidence checklist included in the PDF evidence pack. */
+  evidence: string[];
+}
+export interface PaymentPlanPayload {
+  invoiceId: string;
+  installments: number;
+  /** Minimum amount due per payment (computed when proposed). */
+  minimumAmountDue?: number;
+  note?: string;
+}
+
 export type ActionPayload =
   | { kind: 'refund'; data: RefundPayload }
   | { kind: 'invoice_reminder'; data: InvoiceReminderPayload }
   | { kind: 'accept_dispute'; data: AcceptDisputePayload }
-  | { kind: 'dispute_response_draft'; data: DisputeResponseDraftPayload };
+  | { kind: 'dispute_response_draft'; data: DisputeResponseDraftPayload }
+  | { kind: 'submit_dispute_evidence'; data: SubmitDisputeEvidencePayload }
+  | { kind: 'payment_plan'; data: PaymentPlanPayload };
 
 export type ProposedAction = ActionPayload & {
   id: string;
@@ -137,7 +158,7 @@ export type ProposedAction = ActionPayload & {
   result?: string;
   error?: string;
   /** Which system executed it */
-  executedVia?: 'paypal-agent-toolkit' | 'demo-store' | 'none';
+  executedVia?: 'paypal-agent-toolkit' | 'paypal-rest-api' | 'demo-store' | 'none';
   /** Approval policy outcome (see lib/policies.ts). */
   requiredApprovals?: number;
   approvals?: { by: string; at: string }[];

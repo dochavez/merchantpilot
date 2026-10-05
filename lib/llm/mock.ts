@@ -91,6 +91,20 @@ export function createMockModel(): LanguageModel {
         if (process.env.MOCK_FINAL_TEXT && userText.includes('health')) {
           // Lets tests replay a real model's final answer (e.g. rich markdown) through the UI.
           parts = text(process.env.MOCK_FINAL_TEXT);
+        } else if (r.toolName === 'paypal_list_disputes' && toolNames.has('propose_dispute_evidence')) {
+          const d = (value?.disputes ?? value?.result?.disputes ?? []).find((x: any) => x.status !== 'RESOLVED');
+          parts = d
+            ? call('propose_dispute_evidence', { disputeId: d.disputeId, message: 'The order was shipped on time to the address on the PayPal transaction. Tracking shows it in transit with the carrier; we have opened a claim and will deliver or refund.', evidence: ['Carrier tracking number', 'Shipping address matches PayPal'], rationale: `${d.disputeId}: ${d.daysToRespond} days left to respond.` })
+            : text('No open disputes.');
+        } else if (r.toolName === 'propose_dispute_evidence') {
+          parts = text('I built the evidence pack. Preview it on the card and approve to submit it to PayPal.');
+        } else if (r.toolName === 'paypal_list_invoices' && userText.includes('installment') && toolNames.has('propose_payment_plan')) {
+          const inv = (value?.invoices ?? value?.result?.invoices ?? []).sort((a: any, b: any) => b.daysOverdue - a.daysOverdue)[0];
+          parts = inv ? call('propose_payment_plan', { invoiceId: inv.invoiceId, installments: 3, rationale: `${inv.invoiceNumber} is ${inv.daysOverdue} days late.` }) : text('No overdue invoices.');
+        } else if (r.toolName === 'propose_payment_plan') {
+          parts = text('I prepared a 3-installment plan. Approve it on the card to enable partial payments on the invoice.');
+        } else if (r.toolName === 'paypal_forecast') {
+          parts = text(`Forecast ready: upside ${value?.upside ?? value?.result?.upside}.`);
         } else if (r.toolName === 'paypal_list_invoices' && toolNames.has('propose_invoice_reminder')) {
           const inv = value?.result?.invoices?.[0] ?? value?.invoices?.[0];
           parts = inv
@@ -123,6 +137,10 @@ export function createMockModel(): LanguageModel {
         ];
       } else if (userText.includes('report') && toolNames.has('create_report')) {
         parts = call('create_report', { format: userText.includes('excel') ? 'xlsx' : userText.includes('power bi') ? 'powerbi' : 'pdf' });
+      } else if (userText.includes('dispute') && toolNames.has('propose_dispute_evidence')) {
+        parts = call('paypal_list_disputes', { status: 'open' });
+      } else if (userText.includes('forecast') && toolNames.has('paypal_forecast')) {
+        parts = call('paypal_forecast', { days: 60, fixRefundSpike: true, collectOverdue: true });
       } else if (userText.includes('invoice')) {
         parts = call('paypal_list_invoices', { overdueOnly: true });
       } else {

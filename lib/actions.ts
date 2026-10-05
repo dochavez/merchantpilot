@@ -7,7 +7,8 @@
  */
 import { dataMode } from './config';
 import { getDataset, invalidateDataset, markInvoiceReminded } from './data';
-import { demoAcceptDispute, demoInvoiceReminder, demoRefund } from './demo/store';
+import { demoAcceptDispute, demoInvoiceReminder, demoPaymentPlan, demoRefund, demoSubmitEvidence } from './demo/store';
+import { enablePaymentPlanLive, submitDisputeEvidenceLive } from './paypal/actions-live';
 import { runToolkitTool } from './paypal/toolkit';
 import { cleanApprover, evaluatePolicy, getPolicy } from './policies';
 import { getStore } from './store';
@@ -64,6 +65,29 @@ export async function proposeAction(input: ActionPayload & { rationale: string }
       if (d.status === 'RESOLVED') throw new ActionValidationError(`Dispute ${d.disputeId} is already resolved`);
       title = `Accept dispute ${d.disputeId} (${d.amount.toFixed(2)} ${d.currency}, ${d.reason.replaceAll('_', ' ').toLowerCase()})`;
       impact = { amount: -d.amount, currency: d.currency };
+      break;
+    }
+    case 'submit_dispute_evidence': {
+      const d = ds.disputes.find((x) => x.disputeId === input.data.disputeId);
+      if (!d) throw new ActionValidationError(`No dispute ${input.data.disputeId}`);
+      if (d.status === 'RESOLVED') throw new ActionValidationError(`Dispute ${d.disputeId} is already resolved`);
+      if (d.evidenceSubmittedAt) throw new ActionValidationError(`Evidence for ${d.disputeId} was already submitted at ${d.evidenceSubmittedAt}`);
+      if (!input.data.message?.trim()) throw new ActionValidationError('A seller statement (message) is required');
+      title = `Fight dispute ${d.disputeId} with an evidence pack (protect ${d.amount.toFixed(2)} ${d.currency})`;
+      impact = { amount: d.amount, currency: d.currency };
+      break;
+    }
+    case 'payment_plan': {
+      const inv = ds.invoices.find((i) => i.invoiceId === input.data.invoiceId || i.invoiceNumber === input.data.invoiceId);
+      if (!inv) throw new ActionValidationError(`No invoice ${input.data.invoiceId}`);
+      if (!['SENT', 'UNPAID', 'PARTIALLY_PAID'].includes(inv.status)) throw new ActionValidationError(`Invoice ${inv.invoiceNumber} is ${inv.status}; only unpaid invoices can get a payment plan`);
+      const n = Math.round(input.data.installments);
+      if (!(n >= 2 && n <= 6)) throw new ActionValidationError('Installments must be between 2 and 6');
+      input.data.invoiceId = inv.invoiceId;
+      input.data.installments = n;
+      input.data.minimumAmountDue = Math.ceil((inv.amount / n) * 100) / 100;
+      title = `Offer ${inv.invoiceNumber} to ${inv.recipientName} in ${n} payments of ${input.data.minimumAmountDue.toFixed(2)} ${inv.currency}`;
+      impact = { amount: inv.amount, currency: inv.currency };
       break;
     }
     case 'dispute_response_draft': {
@@ -178,12 +202,22 @@ async function execute(action: ProposedAction): Promise<ProposedAction> {
           ? await runToolkitTool('accept_dispute_claim', { dispute_id: action.data.disputeId, note: toolkitSafeNote(action.data.note) })
           : demoAcceptDispute(action.data.disputeId);
         break;
+      case 'submit_dispute_evidence':
+        result = live ? await submitDisputeEvidenceLive(await getDataset(), action.data) : demoSubmitEvidence(action.data.disputeId);
+        break;
+      case 'payment_plan':
+        result = live
+          ? await enablePaymentPlanLive({ ...action.data, minimumAmountDue: action.data.minimumAmountDue ?? 0 })
+          : demoPaymentPlan(action.data.invoiceId, action.data.installments, action.data.minimumAmountDue ?? 0);
+        if (live) await markInvoiceReminded(action.data.invoiceId);
+        break;
       case 'dispute_response_draft':
         result = { saved: true, note: 'Draft saved for the merchant to review and submit with evidence in PayPal Resolution Center.' };
         break;
     }
     action.status = 'executed';
-    action.executedVia = action.kind === 'dispute_response_draft' ? 'none' : live ? 'paypal-agent-toolkit' : 'demo-store';
+    action.executedVia =
+      action.kind === 'dispute_response_draft' ? 'none' : !live ? 'demo-store' : action.kind === 'submit_dispute_evidence' || action.kind === 'payment_plan' ? 'paypal-rest-api' : 'paypal-agent-toolkit';
     action.result = typeof result === 'string' ? result : JSON.stringify(result);
     invalidateDataset();
   } catch (e) {

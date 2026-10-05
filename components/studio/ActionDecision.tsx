@@ -6,7 +6,7 @@
  */
 import { useEffect, useState } from 'react';
 import type { ProposedAction } from '@/lib/types';
-import { APPROVER_EVENT, STATUS_STYLE, decideActionClient, getApprover } from './actions-client';
+import { APPROVER_EVENT, STATUS_STYLE, decideActionClient, getApprover, viaLabel } from './actions-client';
 
 export function useApprover() {
   const [name, setName] = useState('Owner');
@@ -91,7 +91,7 @@ export default function ActionDecision({ action, onDecided }: { action: Proposed
           <span className={`rounded px-1.5 py-0.5 font-semibold ${STATUS_STYLE[action.status]}`}>{action.autoApproved && action.status === 'executed' ? 'auto-executed' : action.status}</span>
           {action.decidedBy && <span className="text-[var(--muted)]">by {action.decidedBy}</span>}
           {action.executedVia && action.executedVia !== 'none' && (
-            <span className="text-[var(--muted)]">· via {action.executedVia === 'paypal-agent-toolkit' ? 'PayPal Agent Toolkit (sandbox)' : 'demo data'}</span>
+            <span className="text-[var(--muted)]">· via {viaLabel(action.executedVia)}</span>
           )}
         </div>
       )}

@@ -15,12 +15,13 @@ import { toStudioData } from './data-sources';
 import { INITIAL_REPORT } from './initial-report';
 import { AUTO_OPEN_PREFIXES, TOOL_DISPLAY } from './tool-display';
 import { ASK_AI_EVENT, moneyAtStakeWidget } from './MoneyAtStakeWidget';
+import { cashflowForecastWidget } from './CashflowForecastWidget';
 
 const licenseKey = process.env.NEXT_PUBLIC_AG_STUDIO_LICENSE_KEY;
 if (licenseKey) AgStudioLicenseManager.setLicenseKey(licenseKey);
 
 const STUDIO_MODULES = [AgStudioAiModule];
-const STATE_KEY = 'merchantpilot.studioState.v2';
+const STATE_KEY = 'merchantpilot.studioState.v3';
 
 /** MerchantPilot brand on top of Studio's theme (PayPal-like blues, Inter, softer cards). */
 const BRAND_PALETTE = ['#0070E0', '#F59E0B', '#10B981', '#7C3AED', '#DC2626', '#0EA5E9', '#64748B', '#EC4899'];
@@ -44,8 +45,8 @@ const THEME = (studioTheme as any).withParams({
 /** Register the custom widget and give it its own group in Studio's widget menu. */
 const WIDGETS = (w: any) => ({
   ...w,
-  widgets: [...w.widgets, moneyAtStakeWidget],
-  menu: [...w.menu, { label: 'MerchantPilot', widgetIds: ['money-at-stake'] }],
+  widgets: [...w.widgets, moneyAtStakeWidget, cashflowForecastWidget],
+  menu: [...w.menu, { label: 'MerchantPilot', widgetIds: ['money-at-stake', 'cashflow-forecast'] }],
 });
 
 function loadSavedState(): AgReportState | undefined {
@@ -65,7 +66,7 @@ export interface StudioDashboardProps {
 export default function StudioDashboard({ dataset, onApi }: StudioDashboardProps) {
   const adapter = useMemo(() => createServerLlmAdapter(), []);
   const data = useMemo(() => toStudioData(dataset), [dataset]);
-  const [initialState] = useState<AgReportState | undefined>(() => loadSavedState() ?? (INITIAL_REPORT as AgReportState | undefined));
+  const [initialState] = useState<AgReportState | undefined>(() => loadSavedState() ?? (INITIAL_REPORT as unknown as AgReportState));
   const apiRef = useRef<AgStudioApi | null>(null);
 
   const ai = useCallback((params: { api: AgStudioApi }) => buildHarness(params.api, adapter), [adapter]);

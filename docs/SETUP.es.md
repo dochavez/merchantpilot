@@ -178,3 +178,13 @@ En el Action Center, botón **⚖ Rules**:
 - **Límite diario** de dinero que sale (reembolsos y disputas aceptadas).
 
 Cada decisión queda en el historial con quién la tomó y qué regla se aplicó, y sale también en el PDF, el Excel y Power BI.
+
+## Tanda 2: pronóstico, disputas, planes de pago y resumen matutino
+
+- **Pronóstico de flujo de caja** (widget "Cash-flow forecast & what-if" en el dashboard): activa o desactiva *Fix refund spike*, *Chase late invoices*, *Fight disputes* y mueve *Sales*. "Extra cash" muestra cuánto dinero ganas actuando; "Total cash" muestra la proyección completa. El chat responde con el mismo modelo ("¿cuánto vale arreglar los reembolsos?").
+- **Paquete de evidencia para disputas**: pide en el chat "Disputes that need me". La tarjeta trae el enlace *Preview the evidence pack (PDF)*; al aprobar, se envía a PayPal (Disputes API, `provide-evidence`). Si PayPal no acepta evidencia en ese estado de la disputa, se manda el texto como mensaje de la disputa.
+- **Plan de pagos**: pide "Offer the oldest overdue invoice in 3 installments". Al aprobar se activan los pagos parciales en la factura de PayPal y se envía un recordatorio con el enlace de pago.
+- **Resumen matutino**: botón **☀ Brief** arriba. Se puede compartir por WhatsApp o enviar por correo.
+  - Para el correo: crea una cuenta gratis en resend.com, copia la API key y en Render → merchantpilot → Environment agrega `RESEND_API_KEY` y `BRIEF_EMAIL_TO` (tu correo). Con el remitente de prueba de Resend solo puedes enviarte a ti mismo.
+  - Para que llegue solo cada mañana: descomenta el bloque `merchantpilot-morning-brief` en `render.yaml` y pon en ese cron el mismo `CRON_SECRET` que tiene el servicio web.
+  - Los enlaces *Approve* del resumen abren una página de confirmación y caducan en 48 horas.

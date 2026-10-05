@@ -112,7 +112,7 @@ function BiDialog({ onClose }: { onClose: () => void }) {
           </button>
         </div>
         <p className="mt-1 text-xs text-[var(--muted)]">
-          A live OData feed with 9 tables (Transactions, Disputes, Invoices, WeeklyTrend, Products, Countries, Findings, Actions, Kpis). Every refresh reads your current PayPal data.
+          A live OData feed with 10 tables (Transactions, Disputes, Invoices, WeeklyTrend, Products, Countries, Findings, Actions, Forecast, Kpis). Every refresh reads your current PayPal data.
         </p>
         <label className="mt-4 block text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">Feed URL</label>
         <div className="mt-1 flex gap-2">

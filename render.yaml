@@ -50,12 +50,36 @@ services:
         fromDatabase:
           name: merchantpilot-db
           property: connectionString
+      # --- Morning brief: signed approve links + optional daily email (Resend)
+      - key: APP_URL
+        value: https://merchantpilot.onrender.com
+      - key: BRIEF_SIGNING_SECRET
+        generateValue: true
+      - key: CRON_SECRET
+        generateValue: true
+      - key: RESEND_API_KEY
+        sync: false
+      - key: BRIEF_EMAIL_TO
+        sync: false
       # --- Optional: protects the Power BI / Excel OData feed (/api/odata) and export URLs
       - key: EXPORT_API_KEY
         sync: false
       # --- AG Studio trial license (baked into the client bundle at build time)
       - key: NEXT_PUBLIC_AG_STUDIO_LICENSE_KEY
         sync: false
+
+  # Optional daily morning brief email (~cents/month). Uncomment, then set CRON_SECRET to the same
+  # value as the web service (Render → merchantpilot → Environment) and RESEND_API_KEY / BRIEF_EMAIL_TO there.
+  # - type: cron
+  #   name: merchantpilot-morning-brief
+  #   runtime: docker
+  #   image:
+  #     url: docker.io/curlimages/curl:latest
+  #   schedule: "0 13 * * *"   # 07:00 in Guatemala (UTC-6)
+  #   dockerCommand: sh -c 'curl -fsS -X POST https://merchantpilot.onrender.com/api/brief/send -H "Authorization: Bearer $CRON_SECRET"'
+  #   envVars:
+  #     - key: CRON_SECRET
+  #       sync: false
 
 databases:
   # Postgres for the Action Center audit trail and approval rules. "basic-256mb" (~$6/month) does

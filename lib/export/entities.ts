@@ -3,6 +3,7 @@
  * One definition per table: name, key, typed columns and how to get its rows from the report model.
  */
 import type { ReportModel } from './report-model';
+import { forecastCashflow } from '../forecast';
 
 export type EdmType = 'Edm.String' | 'Edm.Decimal' | 'Edm.Int32' | 'Edm.Date' | 'Edm.DateTimeOffset' | 'Edm.Boolean';
 export interface EntityColumn {
@@ -137,6 +138,13 @@ export const ENTITIES: EntityDef[] = [
       { name: 'Result', type: 'Edm.String', get: (r) => r.error ?? r.result ?? null },
     ],
     rows: (m) => m.actions,
+  },
+  {
+    name: 'Forecast',
+    description: 'Projected cumulative net cash for the next 90 days: do nothing vs fixing refunds, chasing invoices and fighting disputes, with an 80% band.',
+    key: 'Date',
+    columns: [date('Date', 'date'), d('DoNothing', 'baseline'), d('WithActions', 'scenario'), d('Low', 'low'), d('High', 'high')],
+    rows: (m) => forecastCashflow(m.dataset, { days: 90, scenario: { fixRefundSpike: true, collectOverdue: true, fightDisputes: true } }).points,
   },
   {
     name: 'Kpis',

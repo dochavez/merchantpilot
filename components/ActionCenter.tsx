@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { ProposedAction } from '@/lib/types';
 import { ACTIONS_CHANGED_EVENT } from './studio/paypal-agent';
-import { KIND_LABEL, STATUS_STYLE, fetchActions, money, setApprover } from './studio/actions-client';
+import { KIND_LABEL, STATUS_STYLE, fetchActions, money, setApprover, viaLabel } from './studio/actions-client';
 import ActionDecision, { useApprover } from './studio/ActionDecision';
 import RulesDialog from './RulesDialog';
 
@@ -81,6 +81,11 @@ export default function ActionCenter() {
                 </ul>
               </details>
             )}
+            {a.kind === 'submit_dispute_evidence' && (
+              <a className="mt-2 inline-block text-xs text-[var(--accent)] underline" href={`/api/disputes/${a.data.disputeId}/evidence-pack?action=${a.id}`} target="_blank" rel="noreferrer">
+                📄 Preview the evidence pack (PDF)
+              </a>
+            )}
             <ActionDecision action={a} onDecided={() => void refresh()} />
           </article>
         ))}
@@ -99,7 +104,7 @@ export default function ActionCenter() {
                   <div className="mt-1 text-[10px] text-[var(--muted)]">
                     {a.decidedAt ? a.decidedAt.slice(0, 16).replace('T', ' ') : ''}
                     {a.decidedBy ? ` · by ${a.decidedBy}` : ''}
-                    {a.executedVia && a.executedVia !== 'none' ? ` · via ${a.executedVia === 'paypal-agent-toolkit' ? 'PayPal Agent Toolkit (sandbox)' : 'demo data'}` : ''}
+                    {a.executedVia && a.executedVia !== 'none' ? ` · via ${viaLabel(a.executedVia)}` : ''}
                   </div>
                   {a.error && <div className="mt-1 text-[10px] text-rose-600">{a.error}</div>}
                 </li>

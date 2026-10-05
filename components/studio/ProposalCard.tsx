@@ -67,6 +67,17 @@ export default function ProposalCard(props: AgAiToolDetailParams) {
           <p className="mt-1 whitespace-pre-wrap">{action.data.message}</p>
         </details>
       )}
+      {action.kind === 'submit_dispute_evidence' && (
+        <a
+          className="mt-2 inline-block text-xs font-medium text-[var(--accent)] underline"
+          href={`/api/disputes/${action.data.disputeId}/evidence-pack?action=${action.id}`}
+          target="_blank"
+          rel="noreferrer"
+          data-testid="evidence-pack-link"
+        >
+          📄 Preview the evidence pack (PDF)
+        </a>
+      )}
       <ActionDecision action={action} onDecided={setAction} />
     </article>
   );

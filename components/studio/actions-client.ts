@@ -52,6 +52,8 @@ export const KIND_LABEL: Record<ProposedAction['kind'], string> = {
   invoice_reminder: 'Invoice reminder',
   accept_dispute: 'Accept dispute',
   dispute_response_draft: 'Dispute response draft',
+  submit_dispute_evidence: 'Fight dispute with evidence',
+  payment_plan: 'Payment plan offer',
 };
 
 export const STATUS_STYLE: Record<ProposedAction['status'], string> = {
@@ -61,3 +63,6 @@ export const STATUS_STYLE: Record<ProposedAction['status'], string> = {
   rejected: 'bg-zinc-200 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-200',
   failed: 'bg-rose-100 text-rose-900 dark:bg-rose-900/40 dark:text-rose-200',
 };
+
+export const viaLabel = (v?: string) =>
+  v === 'paypal-agent-toolkit' ? 'PayPal Agent Toolkit (sandbox)' : v === 'paypal-rest-api' ? 'PayPal REST API (sandbox)' : 'demo data';

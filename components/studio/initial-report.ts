@@ -34,6 +34,11 @@ export const INITIAL_REPORT = {
           },
           format: { title: { enabled: true, text: 'Money at stake – recoverable now' } },
         },
+        'forecast': {
+          type: 'cashflow-forecast',
+          dataMapping: {},
+          format: { title: { enabled: true, text: 'Cash-flow forecast & what-if' } },
+        },
         'trend': {
           type: 'line-chart',
           dataMapping: {
@@ -91,10 +96,11 @@ export const INITIAL_REPORT = {
         'kpi-disputes': { xTrack: 6, yTrack: 0, xSpan: 3, ySpan: 2 },
         'kpi-overdue': { xTrack: 9, yTrack: 0, xSpan: 3, ySpan: 2 },
         'money-at-stake': { xTrack: 0, yTrack: 2, xSpan: 12, ySpan: 2 },
-        'trend': { xTrack: 0, yTrack: 4, xSpan: 7, ySpan: 5 },
-        'refunds-by-item': { xTrack: 7, yTrack: 4, xSpan: 5, ySpan: 5 },
-        'disputes-table': { xTrack: 0, yTrack: 9, xSpan: 6, ySpan: 5 },
-        'invoices-table': { xTrack: 6, yTrack: 9, xSpan: 6, ySpan: 5 },
+        'forecast': { xTrack: 0, yTrack: 4, xSpan: 12, ySpan: 6 },
+        'trend': { xTrack: 0, yTrack: 10, xSpan: 7, ySpan: 5 },
+        'refunds-by-item': { xTrack: 7, yTrack: 10, xSpan: 5, ySpan: 5 },
+        'disputes-table': { xTrack: 0, yTrack: 15, xSpan: 6, ySpan: 5 },
+        'invoices-table': { xTrack: 6, yTrack: 15, xSpan: 6, ySpan: 5 },
       },
     },
   ],

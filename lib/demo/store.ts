@@ -95,3 +95,23 @@ export function demoAcceptDispute(disputeId: string) {
   }
   return { disputeId, status: 'RESOLVED' };
 }
+
+export function demoSubmitEvidence(disputeId: string) {
+  const d = getDemoStore().disputes.find((x) => x.disputeId === disputeId);
+  if (!d) throw new Error(`Dispute ${disputeId} not found in demo data`);
+  if (d.status === 'RESOLVED') throw new Error(`Dispute ${disputeId} is already resolved`);
+  d.status = 'UNDER_REVIEW';
+  d.stage = 'INQUIRY';
+  d.daysToRespond = 0;
+  d.evidenceSubmittedAt = new Date().toISOString();
+  return { disputeId, status: 'UNDER_REVIEW', via: 'demo provide-evidence', attachments: 1 };
+}
+
+export function demoPaymentPlan(invoiceId: string, installments: number, minimumAmountDue: number) {
+  const inv = getDemoStore().invoices.find((i) => i.invoiceId === invoiceId);
+  if (!inv) throw new Error(`Invoice ${invoiceId} not found in demo data`);
+  const now = new Date().toISOString();
+  inv.paymentPlan = { installments, minimumAmountDue, offeredAt: now };
+  inv.lastReminderAt = now;
+  return { invoiceId, partialPayments: true, minimumAmountDue, payUrl: `https://www.sandbox.paypal.com/invoice/p/#${invoiceId}` };
+}

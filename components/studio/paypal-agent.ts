@@ -114,6 +114,18 @@ function buildPayPalTools(api: AgStudioApi): AgAiTool[] {
     define('paypal_list_invoices', 'List PayPal invoices; overdueOnly=true returns unpaid invoices past their due date.', (s) =>
       s.object({ overdueOnly: s.boolean().optional(), status: s.string().optional() }),
     ),
+    define(
+      'paypal_forecast',
+      'Cash-flow forecast for the next N days (default 60) with an optional what-if scenario: fixRefundSpike, collectOverdue (chase/payment plans), fightDisputes (respond with evidence), salesChangePct. Returns baseline vs scenario totals, the upside and the drivers behind it.',
+      (s) =>
+        s.object({
+          days: s.number({ description: '7-120, default 60' }).optional(),
+          fixRefundSpike: s.boolean().optional(),
+          collectOverdue: s.boolean().optional(),
+          fightDisputes: s.boolean().optional(),
+          salesChangePct: s.number({ description: 'e.g. 10 for +10% sales, -20 for -20%' }).optional(),
+        }),
+    ),
     define('paypal_list_actions', 'List actions already proposed/approved/executed in the Action Center, to avoid duplicates and report outcomes.', (s) => s.object({})),
     define(
       'propose_refund',
@@ -146,6 +158,24 @@ function buildPayPalTools(api: AgStudioApi): AgAiTool[] {
       { proposes: true },
     ),
     define(
+      'propose_dispute_evidence',
+      'PROPOSE fighting a dispute: MerchantPilot builds a PDF evidence pack (transaction, customer history, timeline, your statement, evidence checklist) and, once the merchant approves, submits it to PayPal. Use for disputes the merchant should contest.',
+      (s) =>
+        s.object({
+          disputeId: s.string(),
+          message: s.string({ description: 'Seller statement for PayPal/the buyer: factual, polite, specific (max ~1500 chars)' }),
+          evidence: s.array(s.string(), { description: 'Evidence items to list, e.g. tracking number, delivery scan' }),
+          rationale: s.string(),
+        }),
+      { proposes: true },
+    ),
+    define(
+      'propose_payment_plan',
+      'PROPOSE offering an overdue invoice in 2-6 installments: PayPal partial payments get enabled on the invoice and the customer gets a reminder with the pay link. Good for large or very late invoices.',
+      (s) => s.object({ invoiceId: s.string(), installments: s.number({ description: '2-6' }), note: s.string({ description: 'Friendly note to the customer' }).optional(), rationale: s.string() }),
+      { proposes: true },
+    ),
+    define(
       'draft_dispute_response',
       'Save a drafted seller response + evidence checklist for a dispute the merchant should FIGHT. The merchant reviews it in the Action Center.',
       (s) => s.object({ disputeId: s.string(), message: s.string(), evidence: s.array(s.string()), rationale: s.string() }),
@@ -163,8 +193,9 @@ How you work:
 3. When the merchant asks to see, compare or visualise something, FIRST call view_report to see which widgets already exist. Never add a chart that duplicates an existing one (the dashboard already has: KPIs, weekly sales vs refunds, refunds by product, disputes table, invoices table). Instead add the chart that PROVES your finding, e.g. a line chart of daily refunds (transactions.refunds by transactions.date::day) for the last 30 days with transactions.item as legend, or open disputes by country. Prefer the pre-computed fields instead of filters: transactions.sales / refunds / orders / refundCount, disputes.openAmount / isOpen, invoices.overdueAmount / daysOverdue (they are already 0 when not applicable). Avoid filters on status text values. Then delegate to the dashboard agent ("lead") with a precise instruction: data source, exact field ids, chart type, legend, filters, time range and a short descriptive title. Then tell the merchant what was added and why it matters.
 4. Money-moving actions are NEVER executed by you. Use propose_refund, propose_invoice_reminder, propose_accept_dispute or draft_dispute_response. They only queue a proposal. Each proposal appears as a card with Approve/Reject buttons right under your message (and in the Action Center). The merchant's approval rules (⚖ Rules in the Action Center) may auto-execute small actions or require two approvers: read the status and note in each tool result and report exactly that ("done automatically under your rules", "needs a second approver", or "approve or reject it on the card"). Never claim something executed unless the result says executed. Do not repeat the card's details at length.
 5. Before proposing a refund, look up the payment with paypal_find_transactions to get the exact transactionId. Prefer few, high-value, well-justified proposals (max 5 at once) and give each a data-backed rationale.
-6. For disputes: accept only when evidence favours the buyer (e.g. confirmed damaged batch); otherwise draft a response with evidence to fight it. Mention deadlines.
-7. Reports: when the merchant wants a report, a file, Excel, PDF, CSV or Power BI, call create_report (pdf by default; use language 'es' if they write in Spanish). A download card appears under your message.
+6. For disputes: accept only when evidence favours the buyer (e.g. confirmed damaged batch); otherwise call paypal_get_dispute and then propose_dispute_evidence with a factual seller statement and the evidence list (this submits a PDF evidence pack after approval). Mention deadlines. For large or very late invoices, prefer propose_payment_plan (installments) over a plain reminder.
+7. Forecasts / what-if: for questions about future cash, "what happens if…" or "how much is fixing X worth", call paypal_forecast (once without a scenario and once with the relevant scenario flags if useful), quote baseline, scenario and upside, and mention the "Cash-flow forecast" widget on the dashboard where they can toggle the same scenarios.
+7b. Reports: when the merchant wants a report, a file, Excel, PDF, CSV or Power BI, call create_report (pdf by default; use language 'es' if they write in Spanish). A download card appears under your message.
 8. Be concise. End with 1-3 suggested next steps.
 9. Formatting: plain sentences, **bold** labels and simple bullet lists. Do not use markdown headings (lines starting with #) or tables.`;
 

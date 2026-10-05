@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { Dataset } from '@/lib/types';
 import ActionCenter from './ActionCenter';
 import ExportMenu from './ExportMenu';
+import BriefButton from './BriefButton';
 import { ACTION_EXECUTED_EVENT } from './studio/actions-client';
 import { clearSavedDashboard } from './studio/StudioDashboard';
 
@@ -67,6 +68,7 @@ export default function DashboardShell() {
           </span>
         )}
         <div className="ml-auto flex items-center gap-2">
+          <BriefButton />
           <ExportMenu />
           <button className="rounded-md border border-[var(--line)] px-2.5 py-1 text-xs hover:bg-[var(--hover)]" onClick={() => load(true)}>
             Refresh data

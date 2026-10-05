@@ -8,6 +8,7 @@ import { z } from 'zod';
 import { dataMode } from './config';
 import { getDataset } from './data';
 import { detectAnomalies, disputeContext, findTransactions, overview } from './analytics';
+import { forecastCashflow } from './forecast';
 import { listActions, proposeAction } from './actions';
 import type { ProposedAction } from './types';
 
@@ -30,6 +31,13 @@ const schemas = {
   paypal_get_dispute: z.object({ disputeId: str }),
   paypal_list_invoices: z.object({ overdueOnly: z.boolean().optional(), status: z.string().optional() }),
   paypal_list_actions: z.object({}).passthrough(),
+  paypal_forecast: z.object({
+    days: z.number().int().min(7).max(120).optional(),
+    fixRefundSpike: z.boolean().optional(),
+    collectOverdue: z.boolean().optional(),
+    fightDisputes: z.boolean().optional(),
+    salesChangePct: z.number().min(-90).max(200).optional(),
+  }),
   propose_refund: z.object({
     captureId: str,
     amount: z.number().positive().optional(),
@@ -43,6 +51,8 @@ const schemas = {
     rationale: str,
   }),
   propose_accept_dispute: z.object({ disputeId: str, note: str, rationale: str }),
+  propose_dispute_evidence: z.object({ disputeId: str, message: str, evidence: z.array(z.string()).default([]), rationale: str }),
+  propose_payment_plan: z.object({ invoiceId: str, installments: z.number().int().min(2).max(6), note: z.string().max(1000).optional(), rationale: str }),
   draft_dispute_response: z.object({ disputeId: str, message: str, evidence: z.array(z.string()).default([]), rationale: str }),
 } as const;
 
@@ -73,6 +83,28 @@ export async function runAgentTool(name: string, rawArgs: unknown): Promise<unkn
         total: rows.length,
         amountAtRisk: Math.round(rows.filter((d) => d.status !== 'RESOLVED').reduce((s, d) => s + d.amount, 0) * 100) / 100,
         disputes: rows.slice(0, 50),
+      };
+    }
+    case 'propose_dispute_evidence': {
+      const a = await proposeAction({ kind: 'submit_dispute_evidence', data: { disputeId: args.disputeId, message: args.message, evidence: args.evidence }, rationale: args.rationale });
+      return { ...pending(a), evidencePack: `/api/disputes/${args.disputeId}/evidence-pack?action=${a.id}` };
+    }
+    case 'propose_payment_plan':
+      return pending(await proposeAction({ kind: 'payment_plan', data: { invoiceId: args.invoiceId, installments: args.installments, note: args.note }, rationale: args.rationale }));
+    case 'paypal_forecast': {
+      const f = forecastCashflow(ds, { days: args.days ?? 60, scenario: args });
+      // Weekly checkpoints only (keeps tokens low); the chart on the Forecast page shows every day.
+      const weekly = f.points.filter((_, i) => (i + 1) % 7 === 0 || i === f.points.length - 1);
+      return {
+        currency: f.currency,
+        days: f.days,
+        baseline: f.baseline,
+        withScenario: f.withScenario,
+        upside: f.upside,
+        scenario: f.scenario,
+        weeklyCumulativeNet: weekly.map((p) => ({ date: p.date, baseline: p.baseline, scenario: p.scenario, low: p.low, high: p.high })),
+        drivers: f.drivers,
+        note: 'Quote these numbers verbatim. "upside" is how much more cash the scenario brings vs doing nothing. The merchant can toggle the same scenarios in the "Cash-flow forecast" widget on the dashboard.',
       };
     }
     case 'paypal_get_dispute': {

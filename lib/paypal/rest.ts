@@ -83,3 +83,34 @@ export async function paypalPost<T = any>(path: string, payload: unknown, header
   }
   return body as T;
 }
+
+function apiError(method: string, path: string, res: Response, body: any) {
+  const msg = body?.message ?? body?.name ?? res.statusText;
+  const d = Array.isArray(body?.details) ? body.details[0] : undefined;
+  const detail = d ? ` [${d.issue ?? ''}: ${d.description ?? ''}${d.field ? ` field=${d.field}` : ''}]` : '';
+  return new PayPalApiError(`PayPal ${method} ${path} failed (${res.status}): ${msg}${detail}`, res.status, body);
+}
+
+export async function paypalPut<T = any>(path: string, payload: unknown, headers: Record<string, string> = {}): Promise<T> {
+  const token = await getAccessToken();
+  const res = await fetch(config.paypal.baseUrl + path, {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', Prefer: 'return=representation', ...headers },
+    body: JSON.stringify(payload),
+    cache: 'no-store',
+  });
+  const text = await res.text();
+  const body = text ? JSON.parse(text) : {};
+  if (!res.ok) throw apiError('PUT', path, res, body);
+  return body as T;
+}
+
+/** multipart/form-data POST (used by Disputes provide-evidence: an "input" JSON part + files). */
+export async function paypalPostMultipart<T = any>(path: string, form: FormData): Promise<T> {
+  const token = await getAccessToken();
+  const res = await fetch(config.paypal.baseUrl + path, { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: form, cache: 'no-store' });
+  const text = await res.text();
+  const body = text ? JSON.parse(text) : {};
+  if (!res.ok) throw apiError('POST', path, res, body);
+  return body as T;
+}
