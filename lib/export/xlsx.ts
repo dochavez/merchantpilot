@@ -253,11 +253,13 @@ export async function buildWorkbook(m: ReportModel): Promise<Buffer> {
       { header: 'Title', key: 'title', width: 50 },
       { header: 'Status', key: 'status', width: 11 },
       { header: 'Decided at', key: 'decidedAt', width: 20 },
+      { header: 'Decided by', key: 'decidedBy', width: 24 },
+      { header: 'Policy', key: 'policy', width: 40 },
       { header: 'Executed via', key: 'executedVia', width: 22 },
       { header: 'AI rationale', key: 'rationale', width: 60 },
       { header: 'Result / error', key: 'outcome', width: 40 },
     ],
-    m.actions.map((a) => ({ ...a, outcome: a.error ?? a.result ?? '' })) as any,
+    m.actions.map((a) => ({ ...a, outcome: a.error ?? a.result ?? '', policy: (a.policyNotes ?? []).join(' · ') })) as any,
     cur,
   );
 

@@ -158,3 +158,23 @@ npm run smoke -- https://merchantpilot.onrender.com
 - **Power BI Desktop:** descarga el archivo `.pbids` desde el diálogo y ábrelo con doble clic; Power BI se conecta solo. O bien: *Obtener datos → Fuente OData* → pega `https://TU-APP.onrender.com/api/odata` → elige las tablas → *Cargar*.
 - **Excel (Microsoft 365):** *Datos → Obtener datos → Desde otras fuentes → Desde fuente OData* → pega la misma URL. Con *Actualizar todo* se vuelven a leer los datos de PayPal.
 - **Seguridad:** si defines `EXPORT_API_KEY` en Render, Power BI y Excel deben usar autenticación **Básica**: cualquier usuario y la clave como contraseña.
+
+## Base de datos en Render (historial y reglas que no se pierden)
+
+`render.yaml` ahora crea una base **Postgres** (`merchantpilot-db`, plan *basic-256mb*, unos 6 USD al mes) y conecta `DATABASE_URL` sola. El plan gratis de Postgres se borra a los 30 días, antes de que termine la evaluación, por eso no lo usamos.
+
+1. En Render abre **Blueprints → merchantpilot → Manual sync** (o *Sync* si aparece el aviso de cambios). Render crea la base y reinicia el servicio.
+2. Si creaste el servicio a mano y no como Blueprint: **New → Postgres** (nombre `merchantpilot-db`, región Oregon, plan Basic 256MB) y luego, en el servicio web, **Environment → Add → `DATABASE_URL`** con la *Internal Database URL* de la base.
+3. Comprueba en `https://TU-APP.onrender.com/api/health` que diga `"storage":"postgres"`.
+
+Las tablas se crean solas la primera vez. Sin `DATABASE_URL` todo sigue funcionando, pero en memoria.
+
+## Reglas de aprobación
+
+En el Action Center, botón **⚖ Rules**:
+
+- **Auto-aprobar reembolsos pequeños** (máximo 100) y **enviar recordatorios automáticamente**.
+- **Doble aprobación** arriba de cierto monto: hacen falta dos personas distintas. Para probarlo, cambia el nombre en *Approving as* (por ejemplo "Ana (CFO)") y aprueba otra vez.
+- **Límite diario** de dinero que sale (reembolsos y disputas aceptadas).
+
+Cada decisión queda en el historial con quién la tomó y qué regla se aplicó, y sale también en el PDF, el Excel y Power BI.

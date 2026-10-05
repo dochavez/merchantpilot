@@ -45,9 +45,23 @@ services:
         value: "30"
       - key: LLM_DAILY_TURN_CAP
         value: "200"
+      # --- Persistence: audit trail, approval rules, reminder history survive redeploys
+      - key: DATABASE_URL
+        fromDatabase:
+          name: merchantpilot-db
+          property: connectionString
       # --- Optional: protects the Power BI / Excel OData feed (/api/odata) and export URLs
       - key: EXPORT_API_KEY
         sync: false
       # --- AG Studio trial license (baked into the client bundle at build time)
       - key: NEXT_PUBLIC_AG_STUDIO_LICENSE_KEY
         sync: false
+
+databases:
+  # Postgres for the Action Center audit trail and approval rules. "basic-256mb" (~$6/month) does
+  # not expire; Render's free Postgres is deleted 30 days after creation (would die before judging).
+  - name: merchantpilot-db
+    plan: basic-256mb
+    region: oregon
+    databaseName: merchantpilot
+    user: merchantpilot

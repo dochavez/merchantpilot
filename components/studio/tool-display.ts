@@ -14,12 +14,12 @@ export const AUTO_OPEN_PREFIXES = [PROPOSAL_LABEL_PREFIX, REPORT_LABEL_PREFIX];
 
 const running = (p: AgAiToolLabelParams) => p.status !== 'done' && p.status !== 'cancelled';
 
-function proposalTitle(p: AgAiToolLabelParams): string | undefined {
-  if (!p.result?.success) return undefined;
+function proposalInfo(p: AgAiToolLabelParams): { title?: string; status?: string; requiredApprovals?: number } {
+  if (!p.result?.success) return {};
   try {
-    return JSON.parse(p.result.response)?.title;
+    return JSON.parse(p.result.response) ?? {};
   } catch {
-    return undefined;
+    return {};
   }
 }
 
@@ -28,7 +28,9 @@ function proposal(kind: string, preparing: string): AgAiToolDisplay {
     label: (p) => {
       if (running(p)) return { text: preparing };
       if (!p.result?.success) return { text: `${kind} proposal not created` };
-      return { text: `${PROPOSAL_LABEL_PREFIX} ${proposalTitle(p) ?? kind}`, pill: 'Needs approval' };
+      const info = proposalInfo(p);
+      const pill = info.status === 'executed' ? 'Done by your rules' : info.status === 'failed' ? 'Failed' : (info.requiredApprovals ?? 1) > 1 ? 'Needs 2 approvals' : 'Needs approval';
+      return { text: `${PROPOSAL_LABEL_PREFIX} ${info.title ?? kind}`, pill };
     },
     detail: ProposalCard,
   };

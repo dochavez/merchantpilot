@@ -9,7 +9,8 @@ import { useCallback, useEffect, useState } from 'react';
 import type { AgAiToolDetailParams } from 'ag-studio';
 import type { ProposedAction } from '@/lib/types';
 import { ACTIONS_CHANGED_EVENT } from './paypal-agent';
-import { KIND_LABEL, STATUS_STYLE, decideActionClient, fetchActions, money } from './actions-client';
+import { KIND_LABEL, fetchActions, money } from './actions-client';
+import ActionDecision from './ActionDecision';
 
 export function proposalIdFrom(result: AgAiToolDetailParams['result']): string | undefined {
   if (!result || !result.success) return undefined;
@@ -24,9 +25,6 @@ export function proposalIdFrom(result: AgAiToolDetailParams['result']): string |
 export default function ProposalCard(props: AgAiToolDetailParams) {
   const actionId = proposalIdFrom(props.result);
   const [action, setAction] = useState<ProposedAction | null | undefined>(undefined);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
   const refresh = useCallback(async () => {
     if (!actionId) return;
     const all = await fetchActions();
@@ -39,19 +37,6 @@ export default function ProposalCard(props: AgAiToolDetailParams) {
     window.addEventListener(ACTIONS_CHANGED_EVENT, on);
     return () => window.removeEventListener(ACTIONS_CHANGED_EVENT, on);
   }, [refresh]);
-
-  const decide = async (decision: 'approve' | 'reject') => {
-    if (!actionId) return;
-    setBusy(true);
-    setError(null);
-    try {
-      setAction(await decideActionClient(actionId, decision));
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  };
 
   if (props.result && !props.result.success) {
     return <div className="text-xs text-rose-600">{props.result.issues.map((i) => i.message).join(' ')}</div>;
@@ -82,32 +67,7 @@ export default function ProposalCard(props: AgAiToolDetailParams) {
           <p className="mt-1 whitespace-pre-wrap">{action.data.message}</p>
         </details>
       )}
-      {action.status === 'pending' ? (
-        <div className="mt-3 flex gap-2">
-          <button
-            className="flex-1 rounded-md bg-[var(--accent)] px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-50"
-            disabled={busy}
-            onClick={() => decide('approve')}
-          >
-            {busy ? 'Working…' : isDraft ? 'Save draft' : 'Approve'}
-          </button>
-          <button
-            className="rounded-md border border-[var(--line)] px-3 py-1.5 text-xs hover:bg-[var(--hover)] disabled:opacity-50"
-            disabled={busy}
-            onClick={() => decide('reject')}
-          >
-            Reject
-          </button>
-        </div>
-      ) : (
-        <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px]">
-          <span className={`rounded px-1.5 py-0.5 font-semibold ${STATUS_STYLE[action.status]}`}>{action.status}</span>
-          {action.executedVia && action.executedVia !== 'none' && (
-            <span className="text-[var(--muted)]">via {action.executedVia === 'paypal-agent-toolkit' ? 'PayPal Agent Toolkit (sandbox)' : 'demo data'}</span>
-          )}
-        </div>
-      )}
-      {(error || action.error) && <div className="mt-1 text-[11px] text-rose-600">{error ?? action.error}</div>}
+      <ActionDecision action={action} onDecided={setAction} />
     </article>
   );
 }

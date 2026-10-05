@@ -13,11 +13,30 @@ export async function fetchActions(): Promise<ProposedAction[]> {
   return res.ok ? ((await res.json()).actions as ProposedAction[]) : [];
 }
 
+/** Who is approving in this browser (demo identity, used for the two-person rule and audit trail). */
+const APPROVER_KEY = 'merchantpilot.approver';
+export const APPROVER_EVENT = 'merchantpilot:approver-changed';
+export function getApprover(): string {
+  try {
+    return localStorage.getItem(APPROVER_KEY) || 'Owner';
+  } catch {
+    return 'Owner';
+  }
+}
+export function setApprover(name: string) {
+  try {
+    localStorage.setItem(APPROVER_KEY, name.trim().slice(0, 40) || 'Owner');
+  } catch {
+    /* storage unavailable */
+  }
+  window.dispatchEvent(new CustomEvent(APPROVER_EVENT));
+}
+
 export async function decideActionClient(id: string, decision: 'approve' | 'reject'): Promise<ProposedAction | null> {
   const res = await fetch(`/api/actions/${id}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ decision }),
+    body: JSON.stringify({ decision, approver: getApprover() }),
   });
   const body = await res.json().catch(() => ({}));
   window.dispatchEvent(new CustomEvent(ACTIONS_CHANGED_EVENT));

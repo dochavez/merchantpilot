@@ -235,9 +235,9 @@ export async function buildPdf(m: ReportModel, summary: { text: string; byAi: bo
   } else {
     table(
       doc,
-      ['When', 'Action', 'Status', 'Executed via'],
-      m.actions.map((a) => [a.createdAt.slice(0, 16).replace('T', ' '), a.title, a.status, a.executedVia === 'paypal-agent-toolkit' ? 'PayPal Agent Toolkit' : (a.executedVia ?? '—')]),
-      [90, 270, 60, CW - 420],
+      ['When', 'Action', 'Status', 'Decided by'],
+      m.actions.map((a) => [a.createdAt.slice(0, 16).replace('T', ' '), a.title, a.autoApproved && a.status === 'executed' ? 'auto' : a.status, a.decidedBy ?? '—']),
+      [90, 250, 55, CW - 395],
     );
   }
 

@@ -6,7 +6,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AgStudio } from 'ag-studio-react';
-import { AgStudioAiModule, AgStudioLicenseManager } from 'ag-studio';
+import { AgStudioAiModule, AgStudioLicenseManager, studioTheme } from 'ag-studio';
 import type { AgStudioApi, AgReportState } from 'ag-studio';
 import type { Dataset } from '@/lib/types';
 import { createServerLlmAdapter } from './llm-adapter';
@@ -14,12 +14,39 @@ import { buildHarness } from './paypal-agent';
 import { toStudioData } from './data-sources';
 import { INITIAL_REPORT } from './initial-report';
 import { AUTO_OPEN_PREFIXES, TOOL_DISPLAY } from './tool-display';
+import { ASK_AI_EVENT, moneyAtStakeWidget } from './MoneyAtStakeWidget';
 
 const licenseKey = process.env.NEXT_PUBLIC_AG_STUDIO_LICENSE_KEY;
 if (licenseKey) AgStudioLicenseManager.setLicenseKey(licenseKey);
 
 const STUDIO_MODULES = [AgStudioAiModule];
-const STATE_KEY = 'merchantpilot.studioState.v1';
+const STATE_KEY = 'merchantpilot.studioState.v2';
+
+/** MerchantPilot brand on top of Studio's theme (PayPal-like blues, Inter, softer cards). */
+const BRAND_PALETTE = ['#0070E0', '#F59E0B', '#10B981', '#7C3AED', '#DC2626', '#0EA5E9', '#64748B', '#EC4899'];
+const THEME = (studioTheme as any).withParams({
+  accentColor: '#0070E0',
+  fontFamily: { googleFont: 'Inter' },
+  studioCanvasFontFamily: { googleFont: 'Inter' },
+  chartFontFamily: { googleFont: 'Inter' },
+  studioWidgetTitleFontFamily: { googleFont: 'Inter' },
+  studioCanvasBackgroundColor: '#F5F7FB',
+  studioWidgetBorderRadius: 12,
+  studioWidgetTitleFontSize: 15,
+  studioWidgetTitleFontWeight: 600,
+  studioWidgetTitleTextColor: '#0F172A',
+  studioToggleButtonActiveBackgroundColor: '#0070E0',
+  studioToggleButtonActiveBorderColor: '#0070E0',
+  studioToggleButtonActiveColor: '#0070E0',
+  ...Object.fromEntries(BRAND_PALETTE.flatMap((c, i) => [[`chartPaletteFills${i + 1}Color`, c], [`chartPaletteStrokes${i + 1}Color`, c]])),
+});
+
+/** Register the custom widget and give it its own group in Studio's widget menu. */
+const WIDGETS = (w: any) => ({
+  ...w,
+  widgets: [...w.widgets, moneyAtStakeWidget],
+  menu: [...w.menu, { label: 'MerchantPilot', widgetIds: ['money-at-stake'] }],
+});
 
 function loadSavedState(): AgReportState | undefined {
   try {
@@ -74,9 +101,23 @@ export default function StudioDashboard({ dataset, onApi }: StudioDashboardProps
         (row as HTMLElement).click();
       });
     };
+    // "Recover it with AI" (custom widget) → type the prompt into Studio's chat and send it.
+    const onAsk = (e: Event) => {
+      const prompt = String((e as CustomEvent).detail ?? '');
+      const box = host.querySelector<HTMLTextAreaElement>('.ag-studio-ai-panel textarea, textarea[placeholder^="Ask"]');
+      if (!box || !prompt) return;
+      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set?.call(box, prompt);
+      box.dispatchEvent(new Event('input', { bubbles: true }));
+      box.focus();
+      box.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true }));
+    };
+    window.addEventListener(ASK_AI_EVENT, onAsk);
     const obs = new MutationObserver(openProposals);
     obs.observe(host, { subtree: true, childList: true, attributes: true, attributeFilter: ['class'] });
-    return () => obs.disconnect();
+    return () => {
+      obs.disconnect();
+      window.removeEventListener(ASK_AI_EVENT, onAsk);
+    };
   }, []);
 
   return (
@@ -89,6 +130,9 @@ export default function StudioDashboard({ dataset, onApi }: StudioDashboardProps
       initialState={initialState as any}
       ai={ai as any}
       aiToolDisplay={TOOL_DISPLAY as any}
+      theme={THEME}
+      loadThemeGoogleFonts
+      widgets={WIDGETS}
       panels={{ edit: { left: ['data', 'edit', 'filters'], right: ['ai'] } }}
       onApiReady={(e: any) => {
         apiRef.current = e.api;

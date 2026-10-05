@@ -99,7 +99,11 @@ export function createMockModel(): LanguageModel {
         } else if (r.toolName === 'create_report') {
           parts = text('Your report is ready – use the download card above.');
         } else if (r.toolName === 'propose_invoice_reminder') {
-          parts = text('I prepared the reminder. Nothing has been sent yet: approve or reject it on the card above (or in the Action Center).');
+          parts = text(
+            (value?.status ?? value?.result?.status) === 'executed'
+              ? 'Done: your rules allow invoice reminders, so it was sent automatically and logged in the audit trail.'
+              : 'I prepared the reminder. Nothing has been sent yet: approve or reject it on the card above (or in the Action Center).',
+          );
         } else if (last.content.length > 1) {
           parts = text('Health check: ' + last.content.map((c: any) => c.toolName).join(' + ') + ' done.');
         } else if (r.toolName === 'paypal_detect_anomalies') {

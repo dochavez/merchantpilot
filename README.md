@@ -19,7 +19,8 @@ Small merchants live inside PayPal but can't see *why* their money moves. Refund
 1. **Ask** – "Why are my refunds up?" MerchantPilot reads transactions, disputes and invoices and runs deterministic anomaly detection. It finds, for example, that 54% of *Ceramic Pour-Over Kit* orders were refunded in the last 10 days, versus 2% before.
 2. **See** – it delegates to **AG Studio's built-in agents**, which add the chart that proves the finding to the dashboard.
 3. **Approve** – it *proposes* actions such as refunding the affected buyers, reminding the café whose invoice is 34 days late, or accepting a lost-package dispute. Each proposal appears as a card with **Approve / Reject right inside the chat** (and in the **Action Center**). Nothing moves money until the merchant clicks *Approve*. Approved actions then execute through the **PayPal Agent Toolkit**.
-4. **Share** – one click (or one sentence in the chat: *"send me this month's report"*) produces an **executive PDF** with an AI-written summary, an **Excel workbook** with every table ready for pivots, CSVs, or a **live OData feed for Power BI and Excel** that refreshes from PayPal.
+4. **Govern** – the merchant sets **approval rules** (⚖ Rules): auto-approve refunds up to a small amount or invoice reminders, require **two different approvers** above a threshold, and cap daily money out. The AI works inside the rules; every decision (who, when, which rule) lands in a persistent **audit trail** (Postgres).
+5. **Share** – one click (or one sentence in the chat: *"send me this month's report"*) produces an **executive PDF** with an AI-written summary, an **Excel workbook** with every table ready for pivots, CSVs, or a **live OData feed for Power BI and Excel** that refreshes from PayPal.
 
 ## Architecture
 
@@ -75,6 +76,24 @@ With no keys, the app runs on demo data and the chat explains how to add a model
 | `npm test` | Unit tests: analytics, actions, LLM stream conversion, toolkit wiring |
 | `npm run e2e` | Browser test of the full agent → tool → Action Center → approve loop |
 | `npm run smoke -- <url>` | Post-deploy check of a hosted instance |
+
+## AG Studio extensions
+
+- **Custom widget "Money at stake"** (`components/studio/MoneyAtStakeWidget.tsx`): maps any money measures through Studio's data engine (filters apply), shows the recoverable total with a stacked breakdown and a **"Recover it with AI"** button that hands the job to MerchantPilot. Registered in Studio's widget menu under *MerchantPilot* and described to Studio's own AI agents (`ai` metadata), so they can place it too.
+- **In-chat cards** via `aiToolDisplay`: Approve/Reject proposals and download reports inside Studio's AI panel.
+- **Brand theme** via `studioTheme.withParams(...)`: PayPal blues, Inter, chart palette, softer widgets.
+- **Custom agent + Studio's built-in agents** via the Agent Framework (`createAiHarness`, `delegateTo`).
+
+## Approval rules & persistence
+
+| Rule | Default | Notes |
+|---|---|---|
+| Auto-approve refunds up to | off | Capped at 100 so a public demo can't be abused. |
+| Auto-send invoice reminders | off | Still max one reminder per invoice every 3 days. |
+| Two-person approval above | 500 | Refunds and accepted disputes; approvers must be different people. |
+| Daily money-out limit | 2,000 | Approvals beyond it are blocked until the next day. |
+
+Rules are checked when the AI proposes **and** again at approval time. With `DATABASE_URL` set (Render Postgres in `render.yaml`) actions, rules and reminder history survive redeploys; without it they live in memory. Demo and live data are stored separately, and *Reset demo* never wipes the live audit trail. The approver name is a demo identity (no login yet).
 
 ## Exports & BI
 

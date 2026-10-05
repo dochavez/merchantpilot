@@ -9,6 +9,7 @@ import { dataMode } from './config';
 import { getDataset } from './data';
 import { detectAnomalies, disputeContext, findTransactions, overview } from './analytics';
 import { listActions, proposeAction } from './actions';
+import type { ProposedAction } from './types';
 
 const str = z.string().trim().min(1);
 
@@ -99,7 +100,7 @@ export async function runAgentTool(name: string, rawArgs: unknown): Promise<unkn
       };
     }
     case 'paypal_list_actions':
-      return { actions: listActions().slice(0, 30) };
+      return { actions: (await listActions()).slice(0, 30) };
     case 'propose_refund':
       return pending(
         await proposeAction({
@@ -129,11 +130,17 @@ export async function runAgentTool(name: string, rawArgs: unknown): Promise<unkn
   }
 }
 
-function pending(a: { id: string; title: string; status: string }) {
+function pending(a: ProposedAction) {
+  const base = { actionId: a.id, title: a.title, status: a.status, policy: a.policyNotes ?? [] };
+  if (a.status === 'executed')
+    return { ...base, note: `Executed automatically because the merchant's approval rules allow it (${a.decidedBy}). Tell the merchant it is done and that it is logged in the audit trail.` };
+  if (a.status === 'failed') return { ...base, note: `Auto-approved by the merchant's rules but PayPal returned an error: ${a.error}` };
   return {
-    actionId: a.id,
-    title: a.title,
-    status: a.status,
-    note: 'Queued in the Action Center. Nothing has been executed yet: the merchant must approve it.',
+    ...base,
+    requiredApprovals: a.requiredApprovals ?? 1,
+    note:
+      (a.requiredApprovals ?? 1) > 1
+        ? 'Queued. Nothing has been executed yet. This one needs TWO different approvers under the merchant\'s rules.'
+        : 'Queued in the Action Center. Nothing has been executed yet: the merchant must approve it.',
   };
 }

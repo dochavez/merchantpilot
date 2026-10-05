@@ -138,4 +138,23 @@ export type ProposedAction = ActionPayload & {
   error?: string;
   /** Which system executed it */
   executedVia?: 'paypal-agent-toolkit' | 'demo-store' | 'none';
+  /** Approval policy outcome (see lib/policies.ts). */
+  requiredApprovals?: number;
+  approvals?: { by: string; at: string }[];
+  decidedBy?: string;
+  autoApproved?: boolean;
+  policyNotes?: string[];
 };
+
+export interface ApprovalPolicy {
+  /** Refunds up to this amount execute without a click (0 = off). Capped at 100. */
+  autoApproveRefundsUpTo: number;
+  /** Invoice reminders execute without a click. */
+  autoApproveInvoiceReminders: boolean;
+  /** Money-out actions above this amount need two different approvers (0 = off). */
+  dualApprovalAbove: number;
+  /** Max money out (refunds + accepted disputes) per UTC day (0 = off). */
+  dailyRefundLimit: number;
+  updatedAt?: string;
+  updatedBy?: string;
+}

@@ -3,11 +3,14 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { ProposedAction } from '@/lib/types';
 import { ACTIONS_CHANGED_EVENT } from './studio/paypal-agent';
-import { KIND_LABEL, STATUS_STYLE, decideActionClient, fetchActions, money } from './studio/actions-client';
+import { KIND_LABEL, STATUS_STYLE, fetchActions, money, setApprover } from './studio/actions-client';
+import ActionDecision, { useApprover } from './studio/ActionDecision';
+import RulesDialog from './RulesDialog';
 
 export default function ActionCenter() {
   const [actions, setActions] = useState<ProposedAction[]>([]);
-  const [busy, setBusy] = useState<string | null>(null);
+  const [rules, setRules] = useState(false);
+  const approver = useApprover();
 
   const refresh = useCallback(async () => {
     setActions(await fetchActions());
@@ -24,25 +27,29 @@ export default function ActionCenter() {
     };
   }, [refresh]);
 
-  const decide = async (id: string, decision: 'approve' | 'reject') => {
-    setBusy(id);
-    try {
-      // Fires ACTIONS_CHANGED (refreshes this list and the chat cards) and, after an execution,
-      // ACTION_EXECUTED (the dashboard reloads its PayPal data).
-      await decideActionClient(id, decision).catch(() => undefined);
-    } finally {
-      setBusy(null);
-    }
-  };
-
   const pending = actions.filter((a) => a.status === 'pending');
   const history = actions.filter((a) => a.status !== 'pending');
 
   return (
     <aside className="flex h-full flex-col border-l border-[var(--line)] bg-[var(--panel)]" aria-label="Action Center">
       <div className="border-b border-[var(--line)] px-4 py-3">
-        <h2 className="text-sm font-semibold">Action Center</h2>
-        <p className="mt-0.5 text-xs text-[var(--muted)]">The AI proposes. You decide. Nothing moves money until you approve.</p>
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold">Action Center</h2>
+          <button className="rounded-md border border-[var(--line)] px-2 py-0.5 text-[11px] hover:bg-[var(--hover)]" onClick={() => setRules(true)} data-testid="open-rules">
+            ⚖ Rules
+          </button>
+        </div>
+        <p className="mt-0.5 text-xs text-[var(--muted)]">The AI proposes. You decide. Nothing moves money unless you or your rules approve it.</p>
+        <label className="mt-2 flex items-center gap-2 text-[11px] text-[var(--muted)]">
+          Approving as
+          <input
+            className="min-w-0 flex-1 rounded border border-[var(--line)] bg-[var(--card)] px-1.5 py-0.5 text-[11px] text-[var(--text)]"
+            value={approver}
+            onChange={(e) => setApprover(e.target.value)}
+            data-testid="approver-name"
+            aria-label="Approver name"
+          />
+        </label>
       </div>
       <div className="flex-1 space-y-3 overflow-y-auto p-3">
         {pending.length === 0 && (
@@ -74,37 +81,26 @@ export default function ActionCenter() {
                 </ul>
               </details>
             )}
-            <div className="mt-3 flex gap-2">
-              <button
-                className="flex-1 rounded-md bg-[var(--accent)] px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-50"
-                disabled={busy === a.id}
-                onClick={() => decide(a.id, 'approve')}
-              >
-                {busy === a.id ? 'Working…' : a.kind === 'dispute_response_draft' ? 'Save draft' : 'Approve'}
-              </button>
-              <button
-                className="rounded-md border border-[var(--line)] px-3 py-1.5 text-xs hover:bg-[var(--hover)] disabled:opacity-50"
-                disabled={busy === a.id}
-                onClick={() => decide(a.id, 'reject')}
-              >
-                Reject
-              </button>
-            </div>
+            <ActionDecision action={a} onDecided={() => void refresh()} />
           </article>
         ))}
         {history.length > 0 && (
           <div className="pt-2">
-            <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">History</h3>
+            <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">Audit trail</h3>
             <ul className="space-y-2">
               {history.map((a) => (
                 <li key={a.id} className="rounded-md border border-[var(--line)] p-2 text-xs">
                   <div className="flex items-center justify-between gap-2">
                     <span className="truncate font-medium">{a.title}</span>
-                    <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold ${STATUS_STYLE[a.status]}`}>{a.status}</span>
+                    <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold ${STATUS_STYLE[a.status]}`}>
+                      {a.autoApproved && a.status === 'executed' ? 'auto' : a.status}
+                    </span>
                   </div>
-                  {a.executedVia && a.executedVia !== 'none' && (
-                    <div className="mt-1 text-[10px] text-[var(--muted)]">via {a.executedVia === 'paypal-agent-toolkit' ? 'PayPal Agent Toolkit (sandbox)' : 'demo data'}</div>
-                  )}
+                  <div className="mt-1 text-[10px] text-[var(--muted)]">
+                    {a.decidedAt ? a.decidedAt.slice(0, 16).replace('T', ' ') : ''}
+                    {a.decidedBy ? ` · by ${a.decidedBy}` : ''}
+                    {a.executedVia && a.executedVia !== 'none' ? ` · via ${a.executedVia === 'paypal-agent-toolkit' ? 'PayPal Agent Toolkit (sandbox)' : 'demo data'}` : ''}
+                  </div>
                   {a.error && <div className="mt-1 text-[10px] text-rose-600">{a.error}</div>}
                 </li>
               ))}
@@ -112,6 +108,7 @@ export default function ActionCenter() {
           </div>
         )}
       </div>
+      {rules && <RulesDialog onClose={() => setRules(false)} />}
     </aside>
   );
 }

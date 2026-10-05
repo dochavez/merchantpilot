@@ -9,9 +9,12 @@ const { resetDemoStore, getDemoStore } = await import('@/lib/demo/store');
 const { clearActions, decideAction, listActions, proposeAction, toolkitSafeNote } = await import('@/lib/actions');
 const { runAgentTool } = await import('@/lib/agent-tools');
 
-beforeEach(() => {
+const { savePolicy, DEFAULT_POLICY } = await import('@/lib/policies');
+
+beforeEach(async () => {
   resetDemoStore();
-  clearActions();
+  await clearActions();
+  await savePolicy(DEFAULT_POLICY, 'test');
 });
 
 describe('human-in-the-loop actions (demo mode)', () => {
@@ -53,8 +56,49 @@ describe('human-in-the-loop actions (demo mode)', () => {
     const d = getDemoStore().disputes.find((x) => x.status !== 'RESOLVED')!;
     const p: any = await runAgentTool('propose_accept_dispute', { disputeId: d.disputeId, note: 'Package lost by carrier', rationale: 'Tracking shows lost' });
     expect(p.status).toBe('pending');
-    expect(listActions()).toHaveLength(1);
+    expect(await listActions()).toHaveLength(1);
     await expect(runAgentTool('propose_refund', { captureId: 'X' })).rejects.toThrow(/Invalid arguments/);
+  });
+
+  it('auto-approves small refunds only when the merchant enabled it', async () => {
+    const pay = getDemoStore().transactions.find((t) => t.type === 'Payment' && t.status === 'Completed' && t.gross < 40)!;
+    const a = await proposeAction({ kind: 'refund', data: { captureId: pay.transactionId }, rationale: 'x' });
+    expect(a.status).toBe('pending');
+    await decideAction(a.id, 'reject');
+    await savePolicy({ autoApproveRefundsUpTo: 50 }, 'owner');
+    const pay2 = getDemoStore().transactions.find((t) => t.type === 'Payment' && t.status === 'Completed' && t.gross < 40 && t.transactionId !== pay.transactionId)!;
+    const b = await proposeAction({ kind: 'refund', data: { captureId: pay2.transactionId }, rationale: 'x' });
+    expect(b.status).toBe('executed');
+    expect(b.autoApproved).toBe(true);
+    expect(b.decidedBy).toMatch(/Policy/);
+  });
+
+  it('caps auto-approval at 100 even if asked for more', async () => {
+    const p = await savePolicy({ autoApproveRefundsUpTo: 5000 }, 'owner');
+    expect(p.autoApproveRefundsUpTo).toBe(100);
+  });
+
+  it('requires two different approvers above the threshold', async () => {
+    await savePolicy({ dualApprovalAbove: 30 }, 'owner');
+    const pay = getDemoStore().transactions.find((t) => t.type === 'Payment' && t.status === 'Completed' && t.gross > 60)!;
+    const a = await proposeAction({ kind: 'refund', data: { captureId: pay.transactionId }, rationale: 'x' });
+    expect(a.requiredApprovals).toBe(2);
+    const first = await decideAction(a.id, 'approve', 'Danny');
+    expect(first.status).toBe('pending');
+    await expect(decideAction(a.id, 'approve', 'danny')).rejects.toThrow(/second, different approver/);
+    const second = await decideAction(a.id, 'approve', 'Ana (CFO)');
+    expect(second.status).toBe('executed');
+    expect(second.decidedBy).toBe('Danny + Ana (CFO)');
+  });
+
+  it('blocks approvals over the daily money-out limit', async () => {
+    await savePolicy({ dailyRefundLimit: 100, dualApprovalAbove: 0 }, 'owner');
+    const pays = getDemoStore().transactions.filter((t) => t.type === 'Payment' && t.status === 'Completed' && t.gross >= 60 && t.gross <= 90);
+    const a = await proposeAction({ kind: 'refund', data: { captureId: pays[0].transactionId }, rationale: 'x' });
+    expect((await decideAction(a.id, 'approve')).status).toBe('executed');
+    const b = await proposeAction({ kind: 'refund', data: { captureId: pays[1].transactionId }, rationale: 'x' });
+    expect(b.policyNotes).toContain('Over the daily limit');
+    await expect(decideAction(b.id, 'approve')).rejects.toThrow(/Daily money-out limit/);
   });
 
   it('makes accept-claim notes safe for the toolkit schema', () => {

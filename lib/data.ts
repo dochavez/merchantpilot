@@ -5,16 +5,17 @@
 import { dataMode } from './config';
 import { getDemoStore } from './demo/store';
 import { loadLiveDataset } from './paypal/live-data';
+import { getStore } from './store';
 import type { Dataset } from './types';
 
 const KEY = Symbol.for('merchantpilot.liveCache');
-const REMINDED = Symbol.for('merchantpilot.liveReminders');
-type R = typeof globalThis & { [REMINDED]?: Map<string, string> };
 
-/** PayPal's invoice list doesn't expose reminder history, so we remember the ones we sent. */
-export function markInvoiceReminded(invoiceId: string) {
-  const g = globalThis as R;
-  (g[REMINDED] ??= new Map()).set(invoiceId, new Date().toISOString());
+/** PayPal's invoice list doesn't expose reminder history, so we remember the ones we sent (persisted). */
+export async function markInvoiceReminded(invoiceId: string) {
+  const store = getStore();
+  const map = (await store.getSetting<Record<string, string>>('invoiceReminders')) ?? {};
+  map[invoiceId] = new Date().toISOString();
+  await store.setSetting('invoiceReminders', map);
 }
 
 type G = typeof globalThis & { [KEY]?: { at: number; data: Promise<Dataset> } };
@@ -25,9 +26,9 @@ export async function getDataset(opts: { fresh?: boolean } = {}): Promise<Datase
   const g = globalThis as G;
   const c = g[KEY];
   if (!opts.fresh && c && Date.now() - c.at < TTL_MS) return c.data;
-  const data = loadLiveDataset().then((ds) => {
-    const reminded = (globalThis as R)[REMINDED];
-    if (reminded) for (const inv of ds.invoices) inv.lastReminderAt = reminded.get(inv.invoiceId) ?? inv.lastReminderAt;
+  const data = loadLiveDataset().then(async (ds) => {
+    const reminded = (await getStore().getSetting<Record<string, string>>('invoiceReminders').catch(() => undefined)) ?? {};
+    for (const inv of ds.invoices) inv.lastReminderAt = reminded[inv.invoiceId] ?? inv.lastReminderAt;
     return ds;
   });
   g[KEY] = { at: Date.now(), data };

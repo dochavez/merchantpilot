@@ -9,23 +9,16 @@ import { dataMode } from './config';
 import { getDataset, invalidateDataset, markInvoiceReminded } from './data';
 import { demoAcceptDispute, demoInvoiceReminder, demoRefund } from './demo/store';
 import { runToolkitTool } from './paypal/toolkit';
+import { cleanApprover, evaluatePolicy, getPolicy } from './policies';
+import { getStore } from './store';
 import type { ActionPayload, ProposedAction } from './types';
 
-const KEY = Symbol.for('merchantpilot.actions');
-type G = typeof globalThis & { [KEY]?: ProposedAction[] };
-
-function store(): ProposedAction[] {
-  const g = globalThis as G;
-  if (!g[KEY]) g[KEY] = [];
-  return g[KEY]!;
+export async function listActions(): Promise<ProposedAction[]> {
+  return getStore().listActions();
 }
 
-export function listActions(): ProposedAction[] {
-  return [...store()].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-}
-
-export function clearActions() {
-  (globalThis as G)[KEY] = [];
+export async function clearActions() {
+  await getStore().clearActions();
 }
 
 export class ActionValidationError extends Error {}
@@ -81,9 +74,8 @@ export async function proposeAction(input: ActionPayload & { rationale: string }
     }
   }
 
-  const dup = store().find(
-    (a) => a.status === 'pending' && a.kind === input.kind && JSON.stringify(a.data) === JSON.stringify(input.data),
-  );
+  const existing = await getStore().listActions();
+  const dup = existing.find((a) => a.status === 'pending' && a.kind === input.kind && JSON.stringify(a.data) === JSON.stringify(input.data));
   if (dup) return dup;
 
   const action: ProposedAction = {
@@ -94,8 +86,20 @@ export async function proposeAction(input: ActionPayload & { rationale: string }
     impact,
     status: 'pending',
     createdAt: new Date().toISOString(),
+    approvals: [],
   };
-  store().push(action);
+  const decision = evaluatePolicy(action, await getPolicy(), existing);
+  action.requiredApprovals = decision.requiredApprovals;
+  action.policyNotes = decision.notes;
+  await getStore().saveAction(action);
+
+  if (decision.autoApprove) {
+    // The merchant pre-approved this class of action in Rules: execute now, and log who allowed it.
+    action.autoApproved = true;
+    action.approvals = [{ by: 'Policy', at: new Date().toISOString() }];
+    action.decidedBy = `Policy (${decision.notes.at(-1)?.replace('Auto-approved: ', '') ?? 'rules'})`;
+    return execute(action);
+  }
   return action;
 }
 
@@ -111,17 +115,40 @@ export function toolkitSafeNote(note: string) {
   );
 }
 
-export async function decideAction(id: string, decision: 'approve' | 'reject'): Promise<ProposedAction> {
-  const action = store().find((a) => a.id === id);
+export async function decideAction(id: string, decision: 'approve' | 'reject', approverName?: string): Promise<ProposedAction> {
+  const action = await getStore().getAction(id);
   if (!action) throw new ActionValidationError(`Unknown action ${id}`);
   if (action.status !== 'pending') throw new ActionValidationError(`Action already ${action.status}`);
-  action.decidedAt = new Date().toISOString();
+  const approver = cleanApprover(approverName);
+  const now = new Date().toISOString();
 
   if (decision === 'reject') {
     action.status = 'rejected';
+    action.decidedAt = now;
+    action.decidedBy = approver;
+    await getStore().saveAction(action);
     return action;
   }
 
+  // Re-check the rules at approval time (limits may have been reached since the proposal).
+  const others = (await getStore().listActions()).filter((a) => a.id !== action.id);
+  const policy = evaluatePolicy(action, await getPolicy(), others);
+  if (policy.blockedReason) throw new ActionValidationError(policy.blockedReason);
+  action.requiredApprovals = Math.max(action.requiredApprovals ?? 1, policy.requiredApprovals);
+  action.approvals ??= [];
+  if (action.approvals.some((x) => x.by.toLowerCase() === approver.toLowerCase()))
+    throw new ActionValidationError(`${approver} already approved this. It needs a second, different approver (two-person rule).`);
+  action.approvals.push({ by: approver, at: now });
+  if (action.approvals.length < action.requiredApprovals) {
+    await getStore().saveAction(action);
+    return action; // still pending: waiting for the second approver
+  }
+  action.decidedBy = action.approvals.map((x) => x.by).join(' + ');
+  return execute(action);
+}
+
+async function execute(action: ProposedAction): Promise<ProposedAction> {
+  action.decidedAt = new Date().toISOString();
   action.status = 'approved';
   const live = dataMode() === 'live';
   try {
@@ -144,7 +171,7 @@ export async function decideAction(id: string, decision: 'approve' | 'reject'): 
               ...(action.data.note ? { note: action.data.note } : {}),
             })
           : demoInvoiceReminder(action.data.invoiceId);
-        if (live) markInvoiceReminded(action.data.invoiceId);
+        if (live) await markInvoiceReminded(action.data.invoiceId);
         break;
       case 'accept_dispute':
         result = live
@@ -163,5 +190,6 @@ export async function decideAction(id: string, decision: 'approve' | 'reject'): 
     action.status = 'failed';
     action.error = (e as Error).message;
   }
+  await getStore().saveAction(action);
   return action;
 }
