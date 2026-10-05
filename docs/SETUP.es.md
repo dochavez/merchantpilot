@@ -188,3 +188,45 @@ Cada decisión queda en el historial con quién la tomó y qué regla se aplicó
   - Para el correo: crea una cuenta gratis en resend.com, copia la API key y en Render → merchantpilot → Environment agrega `RESEND_API_KEY` y `BRIEF_EMAIL_TO` (tu correo). Con el remitente de prueba de Resend solo puedes enviarte a ti mismo.
   - Para que llegue solo cada mañana: descomenta el bloque `merchantpilot-morning-brief` en `render.yaml` y pon en ese cron el mismo `CRON_SECRET` que tiene el servicio web.
   - Los enlaces *Approve* del resumen abren una página de confirmación y caducan en 48 horas.
+
+## Guía paso a paso: enviar el resumen por correo (Resend)
+
+Resend es un servicio que envía correos desde una aplicación. Tiene un plan gratis (100 correos al día), suficiente para el resumen diario.
+
+1. Entra a **https://resend.com** → **Sign up** (puedes usar tu cuenta de Google o GitHub).
+2. En el menú de la izquierda abre **API Keys** → **Create API Key**. Nombre: `merchantpilot`, permiso: **Sending access** → **Add**. Copia la clave (empieza con `re_`); solo se muestra una vez.
+3. En **Render** abre el servicio **merchantpilot** → **Environment** (menú izquierdo, sección MANAGE).
+4. Busca `RESEND_API_KEY` (si no aparece, botón **+ Add Environment Variable**) y pega la clave. Haz lo mismo con `BRIEF_EMAIL_TO` y escribe **el mismo correo con el que te registraste en Resend** (con el remitente de prueba de Resend solo se puede enviar a ese correo).
+5. Pulsa **Save, rebuild, and deploy** y espera a que el deploy diga *Live*.
+6. En la app: botón **☀ Brief** → **Send test email**. Revisa tu bandeja (y la carpeta de spam la primera vez).
+
+## Guía: crear una disputa real en sandbox
+
+Los pagos del `seed:sandbox` son con tarjeta y no tienen cuenta de comprador, así que no se pueden disputar. Este comando crea un pago que sí:
+
+1. En el PayPal Developer Dashboard → **Testing Tools → Sandbox Accounts**, abre la cuenta **Personal** y copia su correo y contraseña (botón *View/edit account*).
+2. En VS Code: `npm run sandbox:buyer-order`. Abre el enlace que aparece, entra con la cuenta Personal y pulsa **Pagar**. Terminarás en example.com (es normal); la terminal dirá *Captured*.
+3. Entra a **https://www.sandbox.paypal.com** con esa misma cuenta Personal → **Actividad** → el pago → **Informar de un problema** → *No recibí el artículo*.
+4. En unos minutos la disputa aparece en MerchantPilot. Prueba "Disputes that need me" → **Preview the evidence pack** → **Approve**.
+
+## Guía: alertas en tiempo real (webhooks de PayPal)
+
+1. PayPal Developer Dashboard → **Apps & Credentials** → tu app → sección **Webhooks** → **Add Webhook**.
+2. URL: `https://merchantpilot.onrender.com/api/webhooks/paypal`. Eventos: *Customer dispute created/updated/resolved*, *Payment capture completed/refunded/reversed* e *Invoicing invoice paid* → **Save**.
+3. Copia el **Webhook ID** y en Render → Environment ponlo en `PAYPAL_WEBHOOK_ID` → *Save, rebuild, and deploy*.
+4. Cuando el comprador abra la disputa del paso anterior, aparecerá un aviso 🔔 con el botón **Ask AI what to do**. Los eventos de prueba del "Webhooks simulator" de PayPal no traen firma válida, por eso no generan aviso: usa un evento real. En modo demo hay un botón **Simulate new dispute** dentro de la 🔔.
+
+## Guía: usar MerchantPilot desde Claude Desktop (MCP)
+
+1. En Render → Environment copia el valor de `MCP_API_KEY` (Render lo genera solo).
+2. En la app: **Export → Use from Claude, Cursor & other AI apps** → **Copy config**.
+3. Claude Desktop → **Settings → Developer → Edit Config**, pega la configuración, reemplaza `<your MCP_API_KEY>` por la clave y reinicia Claude Desktop. Necesitas Node.js instalado (ya lo tienes).
+4. Pregunta en Claude Desktop: *"Usa merchantpilot: ¿qué facturas están vencidas? Prepárame recordatorios."* Las propuestas llegan al Action Center y Claude te da un enlace para aprobarlas.
+
+## Voz
+
+El botón 🎤 (arriba) funciona en **Chrome, Edge o Safari** (Firefox todavía no soporta reconocimiento de voz). **ES/EN** cambia el idioma y 🔊 hace que la respuesta se lea en voz alta.
+
+## Nota: "7 Issues" en `npm run dev`
+
+El botón rojo abajo a la izquierda solo aparece en desarrollo. Son los avisos de la licencia de prueba de AG Studio en la consola; desaparecen con la clave de licencia y no se ven en Render.

@@ -105,12 +105,22 @@ export default function StudioDashboard({ dataset, onApi }: StudioDashboardProps
     // "Recover it with AI" (custom widget) → type the prompt into Studio's chat and send it.
     const onAsk = (e: Event) => {
       const prompt = String((e as CustomEvent).detail ?? '');
-      const box = host.querySelector<HTMLTextAreaElement>('.ag-studio-ai-panel textarea, textarea[placeholder^="Ask"]');
-      if (!box || !prompt) return;
-      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set?.call(box, prompt);
-      box.dispatchEvent(new Event('input', { bubbles: true }));
-      box.focus();
-      box.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true }));
+      if (!prompt) return;
+      // If the agent is still busy the chat ignores Enter: retry until the message is accepted.
+      const trySend = (attempt: number) => {
+        const box = host.querySelector<HTMLTextAreaElement>('.ag-studio-ai-panel textarea, textarea[placeholder^="Ask"]');
+        if (!box) return;
+        if (box.value !== prompt) {
+          Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set?.call(box, prompt);
+          box.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+        box.focus();
+        box.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true }));
+        setTimeout(() => {
+          if (box.value === prompt && attempt < 20) trySend(attempt + 1);
+        }, 700);
+      };
+      trySend(0);
     };
     window.addEventListener(ASK_AI_EVENT, onAsk);
     const obs = new MutationObserver(openProposals);

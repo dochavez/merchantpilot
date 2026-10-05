@@ -11,6 +11,7 @@ const CSV_TABLES = ['Transactions', 'Disputes', 'Invoices', 'Products', 'Countri
 export default function ExportMenu() {
   const [open, setOpen] = useState(false);
   const [bi, setBi] = useState(false);
+  const [mcp, setMcp] = useState(false);
   const [days, setDays] = useState(30);
   const [lang, setLang] = useState<'en' | 'es'>('en');
   const ref = useRef<HTMLDivElement | null>(null);
@@ -82,6 +83,35 @@ export default function ExportMenu() {
               <span className="text-[var(--muted)]">Refreshable OData feed – no copy &amp; paste</span>
             </span>
           </button>
+          <button
+            className={item}
+            onClick={() => {
+              setMcp(true);
+              setOpen(false);
+            }}
+            data-testid="open-mcp"
+          >
+            <span className="mt-0.5 rounded bg-violet-100 px-1 text-[10px] font-bold text-violet-800">MCP</span>
+            <span>
+              <b>Use from Claude, Cursor & other AI apps</b>
+              <br />
+              <span className="text-[var(--muted)]">MCP server: ask and queue actions from any assistant</span>
+            </span>
+          </button>
+          <details className="px-3 py-1 text-xs">
+            <summary className="cursor-pointer py-1 text-[var(--muted)]">Accounting (QuickBooks / Xero)</summary>
+            <div className="flex flex-wrap gap-1 py-1">
+              <a className="rounded border border-[var(--line)] px-1.5 py-0.5 hover:bg-[var(--hover)]" href={`/api/export/accounting?format=quickbooks&days=${Math.max(days, 30)}`}>
+                QuickBooks Online
+              </a>
+              <a className="rounded border border-[var(--line)] px-1.5 py-0.5 hover:bg-[var(--hover)]" href={`/api/export/accounting?format=xero&days=${Math.max(days, 30)}`}>
+                Xero
+              </a>
+              <a className="rounded border border-[var(--line)] px-1.5 py-0.5 hover:bg-[var(--hover)]" href="/api/export/accounting?format=summary">
+                Monthly summary
+              </a>
+            </div>
+          </details>
           <details className="px-3 py-1 text-xs">
             <summary className="cursor-pointer py-1 text-[var(--muted)]">CSV tables</summary>
             <div className="flex flex-wrap gap-1 py-1">
@@ -95,6 +125,7 @@ export default function ExportMenu() {
         </div>
       )}
       {bi && <BiDialog onClose={() => setBi(false)} />}
+      {mcp && <McpDialog onClose={() => setMcp(false)} />}
     </div>
   );
 }
@@ -141,6 +172,40 @@ function BiDialog({ onClose }: { onClose: () => void }) {
         </div>
         <p className="mt-3 text-[11px] text-[var(--muted)]">
           If the owner set <code>EXPORT_API_KEY</code>, choose <b>Basic</b> authentication: any user name, the key as password.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function McpDialog({ onClose }: { onClose: () => void }) {
+  const url = typeof window === 'undefined' ? '/api/mcp' : `${window.location.origin}/api/mcp`;
+  const config = JSON.stringify(
+    { mcpServers: { merchantpilot: { command: 'npx', args: ['-y', 'mcp-remote', url, '--header', 'Authorization:${AUTH_HEADER}'], env: { AUTH_HEADER: 'Bearer <your MCP_API_KEY>' } } } },
+    null,
+    2,
+  );
+  return (
+    <div className="fixed inset-0 z-[70] grid place-items-center bg-black/40 p-4" onClick={onClose}>
+      <div className="w-full max-w-lg rounded-xl bg-[var(--panel)] p-5 text-sm shadow-2xl" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="MCP server">
+        <div className="flex items-start justify-between">
+          <h2 className="text-base font-semibold">MerchantPilot as an MCP server</h2>
+          <button className="text-[var(--muted)]" onClick={onClose} aria-label="Close">
+            ✕
+          </button>
+        </div>
+        <p className="mt-1 text-xs text-[var(--muted)]">
+          16 tools (KPIs, anomalies, disputes, invoices, forecast, proposals, reports). Proposals still need your approval: each one comes back with a signed approve link.
+        </p>
+        <label className="mt-3 block text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">Endpoint (Streamable HTTP)</label>
+        <code className="mt-1 block break-all rounded bg-[var(--hover)] px-2 py-1.5 text-xs">{url}</code>
+        <label className="mt-3 block text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">Claude Desktop → Settings → Developer → Edit config</label>
+        <pre className="mt-1 max-h-48 overflow-auto rounded bg-[var(--hover)] p-2 text-[11px] leading-snug">{config}</pre>
+        <button className="mt-2 rounded-md bg-[var(--accent)] px-3 py-1.5 text-xs font-semibold text-white" onClick={() => void navigator.clipboard?.writeText(config)}>
+          Copy config
+        </button>
+        <p className="mt-3 text-[11px] text-[var(--muted)]">
+          The key is <code>MCP_API_KEY</code> in Render → Environment (required with live PayPal data; the demo is open). Test it with <code>npx @modelcontextprotocol/inspector</code>.
         </p>
       </div>
     </div>

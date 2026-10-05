@@ -53,6 +53,8 @@ export interface Forecast {
   withScenario: ForecastTotals;
   /** withScenario.net − baseline.net */
   upside: number;
+  /** Upside of each active lever on its own (they overlap a little, so they may not add up exactly). */
+  levers: { key: keyof Scenario; label: string; upside: number }[];
   drivers: string[];
   historyDays: number;
 }
@@ -83,8 +85,13 @@ function inputs(ds: Dataset, now: number): Inputs {
   let refOld = 0;
   let salesOld = 0;
   let first = Infinity;
+  let salesInclToday = 0;
   for (const t of ds.transactions) {
     const ts = Date.parse(t.date);
+    if (t.type === 'Payment' && ts >= start && ts <= today) {
+      salesInclToday += t.gross;
+      first = Math.min(first, ts);
+    }
     if (!(ts >= start && ts < today)) continue;
     first = Math.min(first, ts);
     const recent = ts >= today - 14 * DAY;
@@ -110,7 +117,10 @@ function inputs(ds: Dataset, now: number): Inputs {
     sums[wd] += sales.get(k) ?? 0;
     counts[wd] += 1;
   }
-  const weekday = sums.map((s, i) => (counts[i] ? s / counts[i] : 0));
+  let weekday = sums.map((s, i) => (counts[i] ? s / counts[i] : 0));
+  // Under two weeks of data a weekday pattern is noise: use a flat daily average (today included).
+  const shortHistory = historyDays < 14;
+  if (shortHistory) weekday = Array(7).fill(salesInclToday / Math.max(1, historyDays + 1));
 
   // Noise: residual std of daily sales vs weekday average.
   const res: number[] = [];
@@ -138,7 +148,7 @@ function inputs(ds: Dataset, now: number): Inputs {
     feeRatio: salesSum > 0 ? -fees / salesSum : 0.035,
     refundRateRecent,
     refundRateBaseline: Math.min(refundRateBaseline, refundRateRecent || refundRateBaseline),
-    sigmaDay,
+    sigmaDay: shortHistory ? weekday[0] * 0.3 : sigmaDay,
     historyDays,
     trendRatio,
   };
@@ -223,18 +233,32 @@ export function forecastCashflow(ds: Dataset, opts: { days?: number; scenario?: 
     high: r2(b + z * Math.sqrt(i + 1)),
   }));
 
+  const LEVERS: { key: keyof Scenario; label: string }[] = [
+    { key: 'fixRefundSpike', label: 'Fix refund spike' },
+    { key: 'collectOverdue', label: 'Chase late invoices' },
+    { key: 'fightDisputes', label: 'Fight disputes' },
+    { key: 'salesChangePct', label: `Sales ${(scenario.salesChangePct ?? 0) > 0 ? '+' : ''}${scenario.salesChangePct ?? 0}%` },
+  ];
+  const levers = LEVERS.filter((l) => Boolean(scenario[l.key])).map((l) => ({
+    key: l.key,
+    label: l.label,
+    upside: r2(run(ds, inp, { [l.key]: scenario[l.key] } as Scenario, days, now).totals.net - base.totals.net),
+  }));
   const pct = (x: number) => `${Math.round(x * 1000) / 10}%`;
   const drivers = [
     `Sales follow your weekday pattern of the last ${Math.min(56, inp.historyDays)} days` +
       (inp.trendRatio !== 1 ? `, with half of the recent ${inp.trendRatio > 1 ? 'growth' : 'decline'} (${pct(inp.trendRatio - 1)} over 4 weeks) carried forward.` : '.'),
     `PayPal fees ≈ ${pct(inp.feeRatio)} of sales.`,
     `Refunds at ${pct(inp.refundRateRecent)} of sales (last 14 days)` +
-      (inp.refundRateBaseline < inp.refundRateRecent ? `; fixing the spike brings it back to ${pct(inp.refundRateBaseline)}.` : '.'),
+      (inp.refundRateBaseline < inp.refundRateRecent
+        ? `; fixing the spike brings it back to ${pct(inp.refundRateBaseline)}.`
+        : '; there is no older baseline to compare with yet, so "fix refund spike" has no effect.'),
     'Unpaid invoices are collected with a probability that drops with lateness (70% if ≤15 days late, 50% ≤30, 30% ≤60, 10% after); chasing them raises it.',
     'Open disputes: 60% expected loss, 30% if you respond with evidence, booked ~10 days after each deadline.',
     'Shaded band = 80% range of normal day-to-day sales noise.',
   ];
-  if (inp.historyDays < 21) drivers.unshift(`Only ${inp.historyDays} days of sales history: treat this forecast as rough.`);
+  if (inp.historyDays < 14) drivers.unshift(`Only ${inp.historyDays} day(s) of sales history: using a flat daily average – treat this forecast as rough.`);
+  else if (inp.historyDays < 21) drivers.unshift(`Only ${inp.historyDays} days of sales history: treat this forecast as rough.`);
 
   return {
     currency: ds.currency,
@@ -245,6 +269,7 @@ export function forecastCashflow(ds: Dataset, opts: { days?: number; scenario?: 
     baseline: base.totals,
     withScenario: alt.totals,
     upside: r2(alt.totals.net - base.totals.net),
+    levers,
     drivers,
     historyDays: inp.historyDays,
   };

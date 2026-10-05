@@ -20,7 +20,9 @@
     "e2e": "node tests/e2e/agent-flow.mjs",
     "e2e:exports": "node tests/e2e/exports.mjs",
     "e2e:policies": "node tests/e2e/policies.mjs",
-    "e2e:tanda2": "node tests/e2e/tanda2.mjs"
+    "e2e:tanda2": "node tests/e2e/tanda2.mjs",
+    "sandbox:buyer-order": "tsx scripts/sandbox-buyer-order.ts",
+    "e2e:tanda3": "node tests/e2e/tanda3.mjs"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^4.0.71",
@@ -37,7 +39,8 @@
     "pg": "^8.23.1",
     "react": "19.2.8",
     "react-dom": "19.2.8",
-    "zod": "^3.25.76"
+    "zod": "^3.25.76",
+    "zod-to-json-schema": "^3.25.2"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

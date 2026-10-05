@@ -40,7 +40,7 @@ const simple = (doing: string, done: string, pill?: (args: any) => string | unde
   label: (p) => ({ text: running(p) ? doing : done, pill: pill?.(p.args) }),
 });
 
-const REPORT_NAMES: Record<string, string> = { pdf: 'PDF executive report', xlsx: 'Excel workbook', csv: 'CSV table', powerbi: 'Power BI / Excel live feed' };
+const REPORT_NAMES: Record<string, string> = { pdf: 'PDF executive report', xlsx: 'Excel workbook', csv: 'CSV table', powerbi: 'Power BI / Excel live feed', quickbooks: 'QuickBooks import', xero: 'Xero import' };
 
 export const TOOL_DISPLAY: Record<string, AgAiToolDisplay> = {
   create_report: {

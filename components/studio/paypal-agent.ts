@@ -62,10 +62,10 @@ function buildPayPalTools(api: AgStudioApi): AgAiTool[] {
   const createReport: AgAiTool = api.defineAiTool({
     name: 'create_report',
     description:
-      'Prepare a downloadable report for the merchant: "pdf" (executive report with charts and an AI summary), "xlsx" (Excel workbook with all data as tables), "csv" (one table) or "powerbi" (live connection for Power BI / Excel). Returns a link; a download card appears in the chat.',
+      'Prepare a downloadable report for the merchant: "pdf" (executive report with charts and an AI summary), "xlsx" (Excel workbook with all data as tables), "csv" (one table), "powerbi" (live connection for Power BI / Excel), or "quickbooks" / "xero" (bank-statement CSV for the accountant, fees as separate lines). Returns a link; a download card appears in the chat.',
     params: (s: any) =>
       s.object({
-        format: s.enum(['pdf', 'xlsx', 'csv', 'powerbi']),
+        format: s.enum(['pdf', 'xlsx', 'csv', 'powerbi', 'quickbooks', 'xero']),
         periodDays: s.number({ description: 'Look-back window for KPIs (7-90). Default 30.' }).optional(),
         language: s.enum(['en', 'es']).optional(),
         table: s.enum(['Transactions', 'Disputes', 'Invoices', 'Products', 'Countries', 'WeeklyTrend', 'Findings', 'Actions']).optional(),
@@ -81,7 +81,9 @@ function buildPayPalTools(api: AgStudioApi): AgAiTool[] {
             ? `/api/export/xlsx?days=${days}`
             : format === 'csv'
               ? `/api/export/csv/${args?.table ?? 'Transactions'}?days=${days}`
-              : '/api/odata';
+              : format === 'quickbooks' || format === 'xero'
+                ? `/api/export/accounting?format=${format}&days=${Math.max(days, 30)}`
+                : '/api/odata';
       return ctx.success(JSON.stringify({ format, url, periodDays: days, note: 'A download card is shown to the merchant under your message. Do not paste the link.' }));
     },
   } as any);

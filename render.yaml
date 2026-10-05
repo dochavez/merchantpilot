@@ -57,6 +57,8 @@ services:
         generateValue: true
       - key: CRON_SECRET
         generateValue: true
+      - key: MCP_API_KEY
+        generateValue: true
       - key: RESEND_API_KEY
         sync: false
       - key: BRIEF_EMAIL_TO

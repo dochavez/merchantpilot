@@ -140,12 +140,8 @@ function CashflowForecastWidget(params: AgWidgetParams) {
       )}
       {f && f.upside !== 0 && (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }} data-testid="upside-breakdown">
-          {[
-            ['Fewer refunds', f.baseline.refunds - f.withScenario.refunds],
-            ['Invoices collected', f.withScenario.invoicesCollected - f.baseline.invoicesCollected],
-            ['Disputes saved', f.baseline.disputeLosses - f.withScenario.disputeLosses],
-            ['Sales change (net of fees)', f.withScenario.sales - f.withScenario.fees - (f.baseline.sales - f.baseline.fees)],
-          ]
+          {f.levers
+            .map((l) => [l.label, l.upside] as const)
             .filter(([, v]) => Math.abs(v as number) >= 1)
             .map(([label, v]) => (
               <span key={label as string} style={{ background: (v as number) >= 0 ? '#ECFDF5' : '#FEF2F2', color: (v as number) >= 0 ? '#047857' : '#B91C1C', borderRadius: 999, padding: '2px 8px', fontSize: 11, fontWeight: 600 }}>

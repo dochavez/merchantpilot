@@ -57,6 +57,7 @@ const schemas = {
 } as const;
 
 export type AgentToolName = keyof typeof schemas;
+export const AGENT_TOOL_SCHEMAS = schemas;
 export const AGENT_TOOL_NAMES = Object.keys(schemas) as AgentToolName[];
 
 export async function runAgentTool(name: string, rawArgs: unknown): Promise<unknown> {
@@ -101,6 +102,7 @@ export async function runAgentTool(name: string, rawArgs: unknown): Promise<unkn
         baseline: f.baseline,
         withScenario: f.withScenario,
         upside: f.upside,
+        levers: f.levers,
         scenario: f.scenario,
         weeklyCumulativeNet: weekly.map((p) => ({ date: p.date, baseline: p.baseline, scenario: p.scenario, low: p.low, high: p.high })),
         drivers: f.drivers,

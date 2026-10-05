@@ -115,3 +115,28 @@ export function demoPaymentPlan(invoiceId: string, installments: number, minimum
   inv.lastReminderAt = now;
   return { invoiceId, partialPayments: true, minimumAmountDue, payUrl: `https://www.sandbox.paypal.com/invoice/p/#${invoiceId}` };
 }
+
+/** Demo "webhook": a buyer in Mexico opens an item-not-received dispute on a recent pour-over kit order. */
+export function demoNewDispute() {
+  const store = getDemoStore();
+  const used = new Set(store.disputes.map((d) => d.transactionId));
+  const tx = [...store.transactions].reverse().find((t) => t.type === 'Payment' && t.status === 'Completed' && !used.has(t.transactionId) && t.gross >= 40) ?? store.transactions.find((t) => t.type === 'Payment')!;
+  const now = new Date();
+  const due = new Date(now.getTime() + 10 * 86_400_000);
+  const d = {
+    disputeId: 'PP-D-' + Math.floor(1_000_000 + Math.random() * 8_999_999),
+    transactionId: tx.transactionId,
+    reason: 'MERCHANDISE_OR_SERVICE_NOT_RECEIVED',
+    status: 'WAITING_FOR_SELLER_RESPONSE' as const,
+    stage: 'INQUIRY',
+    amount: round2(tx.gross),
+    currency: tx.currency,
+    createdDate: now.toISOString().slice(0, 10),
+    responseDueDate: due.toISOString().slice(0, 10),
+    daysToRespond: 10,
+    customerEmail: tx.customerEmail,
+    item: tx.item,
+  };
+  store.disputes.unshift(d);
+  return d;
+}

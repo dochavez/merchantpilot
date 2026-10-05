@@ -10,6 +10,7 @@
 import { config, hasPayPalCredentials } from '@/lib/config';
 import { invalidateDataset } from '@/lib/data';
 import { paypalPost } from '@/lib/paypal/rest';
+import { addAlert, alertFromWebhook } from '@/lib/alerts';
 
 const KEY = Symbol.for('merchantpilot.webhookEvents');
 type G = typeof globalThis & { [KEY]?: { id: string; type: string; at: string; verified: boolean }[] };
@@ -51,5 +52,10 @@ export async function POST(req: Request) {
   const g = globalThis as G;
   g[KEY] = [{ id: event.id, type: event.event_type, at: new Date().toISOString(), verified }, ...(g[KEY] ?? [])].slice(0, 50);
   invalidateDataset();
-  return Response.json({ ok: true });
+  // Only signature-verified events become alerts (unverified ones just refresh the data cache).
+  if (verified) {
+    const alert = alertFromWebhook(event);
+    if (alert) await addAlert(alert).catch(() => undefined);
+  }
+  return Response.json({ ok: true, alert: verified });
 }
