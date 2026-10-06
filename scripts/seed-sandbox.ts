@@ -20,7 +20,8 @@ if (!config.paypal.baseUrl.includes('sandbox')) {
   process.exit(1);
 }
 
-// npm run seed:sandbox -- --payments 100 --refunds 21 [--no-invoices]
+// npm run seed:sandbox -- --payments 100 --refunds 21 [--invoices 3 | --no-invoices]
+// Only invoices:  npm run seed:sandbox -- --payments 0 --invoices 30
 // Tip: PayPal records each payment with TODAY's date (it cannot be back-dated). For nicer trend
 // charts run a smaller batch on several days, e.g. `npm run seed:sandbox -- --payments 15 --refunds 3 --no-invoices`.
 function arg(name: string, fallback: number) {
@@ -30,7 +31,8 @@ function arg(name: string, fallback: number) {
 }
 const N_PAYMENTS = Math.min(arg('payments', 100), 300);
 const N_REFUNDS = Math.min(arg('refunds', Math.round(N_PAYMENTS * 0.21)), N_PAYMENTS);
-const WITH_INVOICES = !process.argv.includes('--no-invoices');
+const N_INVOICES = process.argv.includes('--no-invoices') ? 0 : Math.min(arg('invoices', 3), 60);
+const WITH_INVOICES = N_INVOICES > 0;
 
 // Same catalogue (and weights) as the demo dataset, so live and demo charts look alike.
 const PRODUCTS = [
@@ -141,7 +143,7 @@ function isoDate(daysFromToday: number) {
   return new Date(Date.now() + daysFromToday * 86_400_000).toISOString().slice(0, 10);
 }
 
-async function invoice(recipient: { name: string; email: string }, amount: number, invoiceDaysAgo: number, termDays: number) {
+async function invoice(recipient: { name: string; email: string }, amount: number, invoiceDaysAgo: number, termDays: number, item = 'Wholesale beans & supplies') {
   const inv = await paypalPost(
     '/v2/invoicing/invoices',
     {
@@ -153,7 +155,7 @@ async function invoice(recipient: { name: string; email: string }, amount: numbe
       },
       invoicer: { business_name: 'Altura Coffee Supply' },
       primary_recipients: [{ billing_info: { business_name: recipient.name, email_address: recipient.email } }],
-      items: [{ name: 'Wholesale beans & supplies', quantity: '1', unit_amount: { currency_code: 'USD', value: amount.toFixed(2) } }],
+      items: [{ name: item, quantity: '1', unit_amount: { currency_code: 'USD', value: amount.toFixed(2) } }],
     },
     { Prefer: 'return=representation' },
   );
@@ -162,10 +164,15 @@ async function invoice(recipient: { name: string; email: string }, amount: numbe
   return id as string;
 }
 
+/** Records an off-PayPal payment so the invoice shows as paid (MARKED_AS_PAID). */
+async function markPaid(id: string, amount: number, daysAgo: number) {
+  await paypalPost(`/v2/invoicing/invoices/${id}/payments`, { method: 'BANK_TRANSFER', payment_date: isoDate(-daysAgo), amount: { currency_code: 'USD', value: amount.toFixed(2) }, note: 'Paid by bank transfer' });
+}
+
 async function main() {
   console.log('Seeding PayPal sandbox…\n');
 
-  console.log(`Plan: ${N_PAYMENTS} payments, ${N_REFUNDS} refunds${WITH_INVOICES ? ', 3 invoices' : ''}`);
+  console.log(`Plan: ${N_PAYMENTS} payments, ${N_REFUNDS} refunds, ${N_INVOICES} invoices`);
   const captures: { id: string; item: string; price: number; qty: number }[] = [];
   let failures = 0;
   for (let i = 0; i < N_PAYMENTS; i++) {
@@ -216,18 +223,53 @@ async function main() {
     { name: 'Café Lumbre', email: 'sb-cafe-lumbre@example.com' },
     { name: 'Northside Roasters', email: 'sb-northside@example.com' },
     { name: 'Hotel Antigua Central', email: 'sb-hotel-antigua@example.com' },
+    { name: 'Campus Coffee Co-op', email: 'sb-campus-coop@example.com' },
+    { name: 'La Esquina Bakery', email: 'sb-esquina-bakery@example.com' },
+    { name: 'Volcán Coworking', email: 'sb-volcan-cowork@example.com' },
+    { name: 'Bean & Leaf Bistro', email: 'sb-bean-leaf@example.com' },
+    { name: 'Hostal Santa Clara', email: 'sb-santa-clara@example.com' },
+    { name: 'Riverside Deli', email: 'sb-riverside-deli@example.com' },
+    { name: 'Pacific Office Park', email: 'sb-pacific-office@example.com' },
+    { name: 'Mercado Verde', email: 'sb-mercado-verde@example.com' },
+    { name: 'Summit Hotel Group', email: 'sb-summit-hotels@example.com' },
   ];
+  const ITEMS = ['Wholesale beans & supplies', 'Monthly coffee subscription (office)', 'Espresso machine maintenance', 'Barista training workshop', 'Single-origin beans – 20 kg', 'Café equipment lease'];
+  // Mix: ~45% overdue (a few very late), ~30% not due yet, ~25% already paid.
+  // The first three keep the original story: 34, 12 and 6 days overdue.
+  const FIXED = [
+    { daysAgo: 64, amount: 850, kind: 'open' },
+    { daysAgo: 42, amount: 1460, kind: 'open' },
+    { daysAgo: 36, amount: 2070, kind: 'open' },
+  ] as const;
   let invoices = 0;
-  for (const [i, c] of clients.entries()) {
-    try {
-      // invoice issued 40/30/15 days ago with 30-day terms → 10, 0 and -15 days overdue
-      await invoice(c, 850 + i * 610, [64, 42, 36][i], 30);
-      invoices++;
-    } catch (e) {
-      console.log(`  invoice skipped: ${(e as Error).message}`);
+  let paid = 0;
+  for (let i = 0; i < N_INVOICES; i++) {
+    const c = clients[i % clients.length];
+    let daysAgo: number;
+    let amount: number;
+    let kind: 'open' | 'paid';
+    if (i < FIXED.length) ({ daysAgo, amount, kind } = FIXED[i]);
+    else {
+      const r = rnd();
+      kind = r < 0.25 ? 'paid' : 'open';
+      daysAgo = r < 0.25 ? 20 + Math.floor(rnd() * 60) : r < 0.7 ? 35 + Math.floor(rnd() * 55) : 2 + Math.floor(rnd() * 25);
+      amount = Math.round((180 + rnd() * 3000) / 5) * 5;
     }
+    try {
+      const id = await invoice(c, amount, daysAgo, 30, pick(ITEMS));
+      invoices++;
+      if (kind === 'paid') {
+        await markPaid(id, amount, Math.max(0, daysAgo - 25 - Math.floor(rnd() * 10)));
+        paid++;
+      }
+      process.stdout.write(kind === 'paid' ? '$' : 'i');
+    } catch (e) {
+      console.log(`\n  invoice skipped: ${(e as Error).message}`);
+    }
+    await sleep(400);
   }
-  console.log(`✔ ${invoices} invoices sent`);
+  console.log('');
+  console.log(`✔ ${invoices} invoices sent (${paid} marked as paid, ${invoices - paid} open – those past their due date show as overdue)`);
   console.log('\nNote: Transaction Search can take up to 3 hours to show new sandbox activity.');
 }
 

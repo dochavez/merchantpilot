@@ -44,8 +44,9 @@ Un webhook es un aviso que PayPal envía a MerchantPilot cada vez que pasa algo 
 ### 1.2 Decirle a Render cuál es el webhook
 
 1. Entra a **https://dashboard.render.com** → servicio **merchantpilot** → **Environment** (menú izquierdo).
-2. Busca `PAYPAL_WEBHOOK_ID` → **Edit** → pega el ID → **Save, rebuild, and deploy**.
-3. Espera a que el deploy diga **Live** (unos 3 a 5 minutos).
+2. Baja hasta el final de la lista y pulsa **+ Add variable**. En **Key** escribe `PAYPAL_WEBHOOK_ID` y en **Value** pega el ID. (No aparece en la lista porque Render solo crea las variables opcionales si se llenaron al crear el servicio; lo mismo pasa con `RESEND_API_KEY`, `BRIEF_EMAIL_TO` y `EXPORT_API_KEY`.)
+3. Pulsa **Save, rebuild, and deploy**.
+4. Espera a que el deploy diga **Live** (unos 3 a 5 minutos).
 
 > ¿Por qué hace falta el ID? MerchantPilot le pregunta a PayPal "¿esta firma es tuya?" antes de crear un aviso. Sin el ID no puede verificarlo y no crea alertas (así nadie puede enviar avisos falsos).
 
@@ -57,7 +58,7 @@ Un webhook es un aviso que PayPal envía a MerchantPilot cada vez que pasa algo 
    ```
 2. Abre el enlace que aparece, entra con tu cuenta **Personal** del sandbox (Developer Dashboard → **Testing Tools → Sandbox Accounts** → la cuenta *Personal* → **View/edit account** para ver el correo y la contraseña) y pulsa **Pagar**.
 3. Llegarás a una página de example.com (es normal). La terminal dirá **Captured**.
-4. Abre `https://merchantpilot.onrender.com/dashboard`. En unos 10 a 30 segundos la 🔔 muestra un punto rojo y un aviso **Payment received**.
+4. Abre `https://merchantpilot.onrender.com/dashboard` con el **negocio principal** seleccionado (los avisos de PayPal llegan a ese negocio). En unos 10 a 30 segundos la 🔔 muestra un número rojo; ábrela y verás **New sale $79.00 USD**.
 
 **Comprobación técnica:** abre `https://merchantpilot.onrender.com/api/webhooks/paypal` en el navegador. Verás los últimos eventos recibidos; deben decir `"verified": true`.
 

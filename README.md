@@ -78,7 +78,7 @@ With no keys, the app runs on demo data and the chat explains how to add a model
 | Command | What it does |
 |---|---|
 | `npm run check:env` | Live-checks PayPal OAuth, each PayPal API, the LLM and the AG Studio license |
-| `npm run seed:sandbox` | Creates payments, refunds and overdue invoices in your PayPal sandbox (`-- --payments 100 --refunds 21 --no-invoices`) |
+| `npm run seed:sandbox` | Creates payments, refunds and overdue invoices in your PayPal sandbox (`-- --payments 100 --refunds 21 --invoices 30`; invoices only: `-- --payments 0 --invoices 30`) |
 | `npm test` | Unit tests (55): analytics, actions, LLM stream, toolkit, exports, forecast, alerts, MCP, multi-business isolation, portfolio, drill-down, Power BI feed |
 | `npm run e2e` | Browser test of the full agent → tool → Action Center → approve loop (also `e2e:exports`, `e2e:policies`, `e2e:tanda2`, `e2e:tanda3`, `e2e:tanda4`) |
 | `npm run smoke -- <url>` | Post-deploy check of a hosted instance |
@@ -140,6 +140,7 @@ Set `EXPORT_API_KEY` to protect the feed: Power BI / Excel then use **Basic** au
 7. Click **Reset demo** to start over.
 
 Step-by-step test guide (Spanish): [`docs/GUIA-PRUEBAS.es.md`](docs/GUIA-PRUEBAS.es.md) – PayPal webhook, sandbox disputes, MCP Inspector / Claude Desktop, Power BI, multi-business.
+PayPal AI-Toolkit + MerchantPilot MCP side by side in Claude Code (Spanish): [`docs/GUIA-AI-TOOLKIT.es.md`](docs/GUIA-AI-TOOLKIT.es.md).
 
 ## License
 

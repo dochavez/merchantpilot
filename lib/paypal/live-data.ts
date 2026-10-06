@@ -143,8 +143,14 @@ export function normalizeInvoice(inv: any, now = Date.now()): InvoiceRow {
 }
 
 export async function fetchLiveInvoices(): Promise<InvoiceRow[]> {
-  const body = await paypalGet('/v2/invoicing/invoices', { page_size: 100, total_required: true });
-  return (body.items ?? []).map((i: any) => normalizeInvoice(i));
+  const rows: InvoiceRow[] = [];
+  for (let page = 1; page <= 5; page++) {
+    const body = await paypalGet('/v2/invoicing/invoices', { page, page_size: 100, total_required: true });
+    const items = body.items ?? [];
+    rows.push(...items.map((i: any) => normalizeInvoice(i)));
+    if (items.length < 100 || (body.total_pages && page >= body.total_pages)) break;
+  }
+  return rows;
 }
 
 export async function loadLiveDataset(): Promise<Dataset> {

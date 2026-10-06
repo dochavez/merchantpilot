@@ -25,6 +25,9 @@ export default function AlertsBell() {
     if (first) {
       setAlerts(fresh);
       since.current = r.now;
+      // Alerts from the last 30 minutes count as unread, so a sale that arrived before the page opened is still noticed.
+      const recent = fresh.filter((a) => Date.now() - new Date(a.at).getTime() < 30 * 60_000).length;
+      if (recent) setUnread(recent);
       return;
     }
     if (!fresh.length) return;
