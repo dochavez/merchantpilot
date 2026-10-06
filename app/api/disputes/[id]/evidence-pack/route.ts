@@ -1,11 +1,12 @@
 import { getStore } from '@/lib/store';
 import { getDataset } from '@/lib/data';
 import { buildEvidencePdf } from '@/lib/export/evidence-pdf';
+import { withBusiness } from '@/lib/businesses';
 
 export const runtime = 'nodejs';
 
 /** GET /api/disputes/{id}/evidence-pack[?action=act_x] → the PDF that is (or will be) submitted to PayPal. */
-export async function GET(req: Request, ctx: RouteContext<'/api/disputes/[id]/evidence-pack'>) {
+async function GET_handler(req: Request, ctx: RouteContext<'/api/disputes/[id]/evidence-pack'>) {
   const { id } = await ctx.params;
   const actionId = new URL(req.url).searchParams.get('action');
   const action = actionId ? await getStore().getAction(actionId) : undefined;
@@ -20,3 +21,5 @@ export async function GET(req: Request, ctx: RouteContext<'/api/disputes/[id]/ev
     return Response.json({ error: (e as Error).message }, { status: 404 });
   }
 }
+
+export const GET = withBusiness(GET_handler);

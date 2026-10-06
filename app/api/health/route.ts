@@ -1,10 +1,11 @@
 import { dataMode, hasPayPalCredentials, llmModelId, llmProvider } from '@/lib/config';
 import { getStore } from '@/lib/store';
+import { withBusiness } from '@/lib/businesses';
 
 export const dynamic = 'force-dynamic';
 
 /** Used by Render's health check and by the landing page status pills. Never exposes secrets. */
-export async function GET() {
+async function GET_handler() {
   // Health must stay green even if the database is briefly unreachable; report it instead.
   const store = getStore();
   const storage = await Promise.race([
@@ -25,3 +26,5 @@ export async function GET() {
     time: new Date().toISOString(),
   });
 }
+
+export const GET = withBusiness(GET_handler);

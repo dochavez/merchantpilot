@@ -8,6 +8,8 @@ import ActionCenter from './ActionCenter';
 import ExportMenu from './ExportMenu';
 import BriefButton from './BriefButton';
 import AlertsBell from './AlertsBell';
+import BusinessSwitcher from './BusinessSwitcher';
+import DetailDrawer from './DetailDrawer';
 import VoiceButton from './VoiceButton';
 import { ACTION_EXECUTED_EVENT } from './studio/actions-client';
 import { clearSavedDashboard } from './studio/StudioDashboard';
@@ -57,18 +59,7 @@ export default function DashboardShell() {
           <span className="grid h-7 w-7 place-items-center rounded-md bg-[var(--accent)] text-xs font-bold text-white">MP</span>
           <span className="hidden sm:inline">MerchantPilot</span>
         </Link>
-        {dataset && (
-          <span className="truncate text-sm text-[var(--muted)]">
-            {dataset.merchantName}
-            <span
-              className={`ml-2 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
-                dataset.mode === 'live' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
-              }`}
-            >
-              {dataset.mode === 'live' ? 'PayPal sandbox · live' : 'Demo data'}
-            </span>
-          </span>
-        )}
+        {dataset && <BusinessSwitcher fallbackName={dataset.merchantName} live={dataset.mode === 'live'} />}
         <div className="ml-auto flex items-center gap-2">
           <VoiceButton />
           <AlertsBell />
@@ -105,6 +96,7 @@ export default function DashboardShell() {
           </div>
         )}
       </main>
+      <DetailDrawer />
     </div>
   );
 }

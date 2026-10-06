@@ -1,11 +1,12 @@
 import { addAlert } from '@/lib/alerts';
 import { dataMode } from '@/lib/config';
 import { demoNewDispute } from '@/lib/demo/store';
+import { withBusiness } from '@/lib/businesses';
 
 export const dynamic = 'force-dynamic';
 
 /** Demo only: simulate PayPal sending CUSTOMER.DISPUTE.CREATED (adds a real dispute to the demo data). */
-export async function POST() {
+async function POST_handler() {
   if (dataMode() !== 'demo') return Response.json({ error: 'Simulation is only available with demo data. In live mode alerts come from verified PayPal webhooks.' }, { status: 403 });
   const d = demoNewDispute();
   const alert = await addAlert({
@@ -18,3 +19,5 @@ export async function POST() {
   });
   return Response.json({ alert, dispute: d });
 }
+
+export const POST = withBusiness(POST_handler);

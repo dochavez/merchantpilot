@@ -64,9 +64,17 @@ export default function ExportMenu() {
           <a className={item} href={`/api/export/xlsx?days=${days}`} onClick={() => setOpen(false)}>
             <span className="mt-0.5 rounded bg-emerald-100 px-1 text-[10px] font-bold text-emerald-700">XLSX</span>
             <span>
-              <b>Excel workbook</b>
+              <b>Excel (simple)</b>
               <br />
-              <span className="text-[var(--muted)]">Summary + 9 sheets as Excel tables, ready for pivots</span>
+              <span className="text-[var(--muted)]">4 sheets: Summary, Transactions, Disputes, Invoices</span>
+            </span>
+          </a>
+          <a className={item} href={`/api/export/xlsx?days=${days}&mode=full`} onClick={() => setOpen(false)}>
+            <span className="mt-0.5 rounded bg-emerald-50 px-1 text-[10px] font-bold text-emerald-700">XLSX+</span>
+            <span>
+              <b>Excel (full workbook)</b>
+              <br />
+              <span className="text-[var(--muted)]">10 sheets incl. weekly, products, countries, audit trail – for pivots</span>
             </span>
           </a>
           <button
@@ -131,7 +139,9 @@ export default function ExportMenu() {
 }
 
 function BiDialog({ onClose }: { onClose: () => void }) {
-  const feed = typeof window === 'undefined' ? '/api/odata' : `${window.location.origin}/api/odata`;
+  const [scope, setScope] = useState<'all' | 'one'>('all');
+  const origin = typeof window === 'undefined' ? '' : window.location.origin;
+  const feed = `${origin}/api/odata${scope === 'all' ? '/all' : ''}`;
   const [copied, setCopied] = useState(false);
   return (
     <div className="fixed inset-0 z-[70] grid place-items-center bg-black/40 p-4" onClick={onClose}>
@@ -143,11 +153,30 @@ function BiDialog({ onClose }: { onClose: () => void }) {
           </button>
         </div>
         <p className="mt-1 text-xs text-[var(--muted)]">
-          A live OData feed with 10 tables (Transactions, Disputes, Invoices, WeeklyTrend, Products, Countries, Findings, Actions, Forecast, Kpis). Every refresh reads your current PayPal data.
+          A live OData feed with 11 tables (Businesses, Transactions, Disputes, Invoices, WeeklyTrend, Products, Countries, Findings, Actions, Forecast, Kpis). Every table has BusinessId / BusinessName so you can slice by business. Every refresh reads current PayPal data.
         </p>
-        <label className="mt-4 block text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">Feed URL</label>
+        <div className="mt-3 inline-flex overflow-hidden rounded-md border border-[var(--line)] text-xs">
+          {(
+            [
+              ['all', 'All my businesses'],
+              ['one', 'Primary business only'],
+            ] as const
+          ).map(([v, label]) => (
+            <button
+              key={v}
+              className={`px-3 py-1 ${scope === v ? 'bg-[var(--accent)] text-white' : 'hover:bg-[var(--hover)]'}`}
+              onClick={() => {
+                setScope(v);
+                setCopied(false);
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <label className="mt-3 block text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">Feed URL</label>
         <div className="mt-1 flex gap-2">
-          <input readOnly value={feed} className="min-w-0 flex-1 rounded-md border border-[var(--line)] bg-[var(--card)] px-2 py-1.5 font-mono text-xs" onFocus={(e) => e.target.select()} />
+          <input readOnly value={feed} data-testid="bi-feed-url" className="min-w-0 flex-1 rounded-md border border-[var(--line)] bg-[var(--card)] px-2 py-1.5 font-mono text-xs" onFocus={(e) => e.target.select()} />
           <button
             className="rounded-md bg-[var(--accent)] px-3 text-xs font-semibold text-white"
             onClick={() => {
@@ -160,10 +189,10 @@ function BiDialog({ onClose }: { onClose: () => void }) {
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <div className="rounded-lg border border-[var(--line)] p-3">
             <div className="text-xs font-semibold">Power BI Desktop</div>
-            <a className="mt-2 inline-block rounded-md bg-amber-400 px-2.5 py-1 text-xs font-semibold text-black hover:opacity-90" href="/api/export/pbids">
+            <a className="mt-2 inline-block rounded-md bg-amber-400 px-2.5 py-1 text-xs font-semibold text-black hover:opacity-90" href={`/api/export/pbids${scope === 'all' ? '?scope=all' : ''}`}>
               Download .pbids (1-click)
             </a>
-            <p className="mt-2 text-[11px] text-[var(--muted)]">Or: Get data → OData feed → paste the URL → pick the tables → Load.</p>
+            <p className="mt-2 text-[11px] text-[var(--muted)]">Or: Get data → OData feed → paste the URL → Anonymous → pick the tables → Load.</p>
           </div>
           <div className="rounded-lg border border-[var(--line)] p-3">
             <div className="text-xs font-semibold">Excel (Microsoft 365)</div>
@@ -171,7 +200,7 @@ function BiDialog({ onClose }: { onClose: () => void }) {
           </div>
         </div>
         <p className="mt-3 text-[11px] text-[var(--muted)]">
-          If the owner set <code>EXPORT_API_KEY</code>, choose <b>Basic</b> authentication: any user name, the key as password.
+          Tip: load <b>Businesses</b> + <b>Transactions</b>, relate them on BusinessId, and add a slicer on BusinessName. If the owner set <code>EXPORT_API_KEY</code>, choose <b>Basic</b> authentication: any user name, the key as password.
         </p>
       </div>
     </div>
@@ -195,7 +224,7 @@ function McpDialog({ onClose }: { onClose: () => void }) {
           </button>
         </div>
         <p className="mt-1 text-xs text-[var(--muted)]">
-          16 tools (KPIs, anomalies, disputes, invoices, forecast, proposals, reports). Proposals still need your approval: each one comes back with a signed approve link.
+          17 tools (KPIs, portfolio, anomalies, disputes, invoices, forecast, proposals, reports). Proposals still need your approval: each one comes back with a signed approve link.
         </p>
         <label className="mt-3 block text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">Endpoint (Streamable HTTP)</label>
         <code className="mt-1 block break-all rounded bg-[var(--hover)] px-2 py-1.5 text-xs">{url}</code>

@@ -2,6 +2,8 @@
 
 Esta guía explica qué cuentas crear, qué descargar y cómo dejar el proyecto corriendo en tu computadora y en Render. Calcula unos 45 minutos la primera vez.
 
+> **Guía de pruebas paso a paso** (webhook, disputas, MCP, Power BI, varios negocios): [GUIA-PRUEBAS.es.md](GUIA-PRUEBAS.es.md)
+
 ## 0. Requisitos en tu computadora
 
 | Herramienta | Versión | Para qué |

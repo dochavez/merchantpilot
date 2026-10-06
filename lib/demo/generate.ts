@@ -44,7 +44,7 @@ function addDays(d: Date, days: number) {
 
 export const DEMO_MERCHANT = 'Altura Coffee Supply (demo)';
 
-const PRODUCTS = [
+const SUPPLY_PRODUCTS = [
   { name: 'Ceramic Pour-Over Kit', price: 64, weight: 14 },
   { name: 'Burr Grinder Pro', price: 189, weight: 6 },
   { name: 'Single-Origin Beans 1kg', price: 32, weight: 30 },
@@ -55,7 +55,7 @@ const PRODUCTS = [
   { name: 'Paper Filters x200', price: 12, weight: 23 },
 ] as const;
 
-const COUNTRIES = [
+const SUPPLY_COUNTRIES = [
   { code: 'US', weight: 48 },
   { code: 'CA', weight: 10 },
   { code: 'GB', weight: 9 },
@@ -69,7 +69,7 @@ const FIRST = ['Ana', 'Luis', 'Maya', 'Noah', 'Sofía', 'Liam', 'Valeria', 'Etha
 const LAST = ['García', 'Smith', 'Lopez', 'Chen', 'Martínez', 'Brown', 'Hernández', 'Müller', 'Rossi', 'Wilson', 'Pérez', 'Taylor', 'Ramírez', 'Clark', 'Morales', 'Evans'];
 const INSTRUMENTS = ['PayPal Wallet', 'PayPal Wallet', 'PayPal Wallet', 'Credit Card', 'Debit Card', 'Venmo', 'Pay Later'];
 
-const WHOLESALE = [
+const SUPPLY_CLIENTS = [
   { name: 'Café Lumbre', email: 'pagos@cafelumbre.example' },
   { name: 'Northside Roasters', email: 'ap@northside.example' },
   { name: 'Bean & Leaf Bistro', email: 'billing@beanleaf.example' },
@@ -77,16 +77,153 @@ const WHOLESALE = [
   { name: 'Campus Coffee Co-op', email: 'treasurer@campuscoop.example' },
 ];
 
+/**
+ * Demo business profiles. "supply" is the original online coffee-gear shop; the other two let the
+ * multi-business portfolio show contrasting stories:
+ *  - cafe:    an in-person café in Antigua Guatemala – many small tickets, sales slowly DECLINING,
+ *             a card-testing / unauthorised-payment cluster, overdue catering invoices.
+ *  - academy: online barista courses – digital goods, high tickets, refund spike on the bootcamp
+ *             and unauthorised-transaction disputes concentrated in two countries.
+ */
+export interface DemoProfile {
+  merchant: string;
+  seed: number;
+  products: readonly { name: string; price: number; weight: number }[];
+  countries: readonly { code: string; weight: number }[];
+  clients: readonly { name: string; email: string }[];
+  invoicePrefix: string;
+  ordersBase: number;
+  growthPerDay: number;
+  weekendBoost: number;
+  refundBase: number;
+  spikeProduct?: string;
+  spikeRate: number;
+  disputeCountries: readonly string[];
+  disputeReason: string;
+  disputeMinPrice: number;
+  disputeRate: number;
+  payout: [number, number];
+  invoiceRange: [number, number];
+  forcedOverdue: number[];
+  instruments?: readonly string[];
+}
+
+export const DEMO_PROFILES: Record<string, DemoProfile> = {
+  supply: {
+    merchant: DEMO_MERCHANT,
+    seed: 20261112,
+    products: SUPPLY_PRODUCTS,
+    countries: SUPPLY_COUNTRIES,
+    clients: SUPPLY_CLIENTS,
+    invoicePrefix: 'ALT',
+    ordersBase: 22,
+    growthPerDay: 0.12,
+    weekendBoost: 9,
+    refundBase: 0.02,
+    spikeProduct: 'Ceramic Pour-Over Kit',
+    spikeRate: 0.45,
+    disputeCountries: ['MX', 'GT'],
+    disputeReason: 'MERCHANDISE_OR_SERVICE_NOT_RECEIVED',
+    disputeMinPrice: 40,
+    disputeRate: 0.18,
+    payout: [3800, 1600],
+    invoiceRange: [450, 2600],
+    forcedOverdue: [34, 12, 6],
+  },
+  cafe: {
+    merchant: 'Altura Café Antigua (demo)',
+    seed: 7714,
+    products: [
+      { name: 'Espresso', price: 3, weight: 26 },
+      { name: 'Cappuccino', price: 4.5, weight: 30 },
+      { name: 'Cold Brew', price: 5, weight: 14 },
+      { name: 'Breakfast Plate', price: 9, weight: 12 },
+      { name: 'Pastry', price: 3.5, weight: 20 },
+      { name: 'Beans 340g to go', price: 14, weight: 6 },
+      { name: 'Event Catering Box', price: 85, weight: 1 },
+    ],
+    countries: [
+      { code: 'GT', weight: 78 },
+      { code: 'US', weight: 12 },
+      { code: 'MX', weight: 4 },
+      { code: 'ES', weight: 3 },
+      { code: 'CA', weight: 3 },
+    ],
+    clients: [
+      { name: 'Hotel Casa Santo Domingo', email: 'compras@casasantodomingo.example' },
+      { name: 'Antigua Language School', email: 'admin@antigualang.example' },
+      { name: 'Volcán Tours', email: 'pagos@volcantours.example' },
+      { name: 'Coworking La Merced', email: 'hola@lamerced.example' },
+    ],
+    invoicePrefix: 'CAF',
+    ordersBase: 95,
+    growthPerDay: -0.32,
+    weekendBoost: 30,
+    refundBase: 0.006,
+    spikeRate: 0,
+    disputeCountries: ['US', 'CA'],
+    disputeReason: 'UNAUTHORISED',
+    disputeMinPrice: 0,
+    disputeRate: 0.004,
+    payout: [1900, 700],
+    invoiceRange: [180, 900],
+    forcedOverdue: [41, 19],
+    instruments: ['Credit Card', 'Debit Card', 'Debit Card', 'PayPal Wallet', 'Venmo'],
+  },
+  academy: {
+    merchant: 'Altura Barista Academy (demo)',
+    seed: 99021,
+    products: [
+      { name: 'Barista Fundamentals (online)', price: 120, weight: 30 },
+      { name: 'Latte Art Masterclass', price: 89, weight: 25 },
+      { name: 'Coffee Business Bootcamp', price: 349, weight: 10 },
+      { name: 'Monthly Membership', price: 19, weight: 30 },
+      { name: '1:1 Coaching Session', price: 75, weight: 5 },
+    ],
+    countries: [
+      { code: 'US', weight: 30 },
+      { code: 'MX', weight: 18 },
+      { code: 'ES', weight: 14 },
+      { code: 'CO', weight: 12 },
+      { code: 'BR', weight: 10 },
+      { code: 'GB', weight: 8 },
+      { code: 'GT', weight: 8 },
+    ],
+    clients: [
+      { name: 'Café Collective Bogotá', email: 'training@cafecollective.example' },
+      { name: 'Roast & Co. Madrid', email: 'rrhh@roastco.example' },
+      { name: 'Hospitality Institute GT', email: 'finanzas@hospitalityinst.example' },
+    ],
+    invoicePrefix: 'ACA',
+    ordersBase: 11,
+    growthPerDay: 0.09,
+    weekendBoost: 2,
+    refundBase: 0.03,
+    spikeProduct: 'Coffee Business Bootcamp',
+    spikeRate: 0.32,
+    disputeCountries: ['BR', 'CO'],
+    disputeReason: 'UNAUTHORISED',
+    disputeMinPrice: 80,
+    disputeRate: 0.12,
+    payout: [1500, 900],
+    invoiceRange: [900, 4200],
+    forcedOverdue: [9],
+  },
+};
+
 /* ------------------------------------------------------------------------------- generator */
 
 export interface GenerateOptions {
   today?: Date;
   days?: number;
   seed?: number;
+  /** Demo profile id (supply | cafe | academy). */
+  profile?: string;
 }
 
 export function generateDemoDataset(opts: GenerateOptions = {}): Dataset {
-  const rand = mulberry32(opts.seed ?? 20261112);
+  const P = DEMO_PROFILES[opts.profile ?? 'supply'] ?? DEMO_PROFILES.supply;
+  const rand = mulberry32(opts.seed ?? P.seed);
   const today = opts.today ?? new Date();
   const days = opts.days ?? 90;
 
@@ -112,14 +249,14 @@ export function generateDemoDataset(opts: GenerateOptions = {}): Dataset {
     const daysAgo = days - 1 - d;
     const dow = day.getUTCDay();
     // Weekly seasonality + slow growth trend.
-    const base = 22 + d * 0.12 + (dow === 0 || dow === 6 ? 9 : 0);
-    const orders = Math.max(5, Math.round(base + (rand() - 0.5) * 10));
+    const base = P.ordersBase + d * P.growthPerDay + (dow === 0 || dow === 6 ? P.weekendBoost : 0);
+    const orders = Math.max(3, Math.round(base + (rand() - 0.5) * Math.max(10, P.ordersBase * 0.2)));
 
     for (let o = 0; o < orders; o++) {
-      const product = weighted(PRODUCTS);
+      const product = weighted(P.products);
       const qty = product.price < 20 ? 1 + Math.floor(rand() * 3) : 1;
       const gross = round2(product.price * qty * (rand() < 0.15 ? 0.9 : 1));
-      const country = weighted(COUNTRIES).code;
+      const country = weighted(P.countries).code;
       const first = pick(FIRST);
       const last = pick(LAST);
       const email = `${first}.${last}${Math.floor(rand() * 90 + 10)}`
@@ -144,13 +281,13 @@ export function generateDemoDataset(opts: GenerateOptions = {}): Dataset {
         customerEmail: email,
         customerName: `${first} ${last}`,
         country,
-        instrument: pick(INSTRUMENTS),
+        instrument: pick(P.instruments ?? INSTRUMENTS),
         item: product.name,
       });
 
       // ---- refunds: 2% baseline, pour-over kit spikes in the last 10 days (damaged batch)
-      const spike = product.name === 'Ceramic Pour-Over Kit' && daysAgo <= 10 && daysAgo >= 1;
-      const refundP = spike ? 0.45 : 0.02;
+      const spike = !!P.spikeProduct && product.name === P.spikeProduct && daysAgo <= 10 && daysAgo >= 1;
+      const refundP = spike ? P.spikeRate : P.refundBase;
       if (!pending && rand() < refundP) {
         const lag = 1 + Math.floor(rand() * 3);
         const rts = new Date(Math.min(ts.getTime() + lag * 86_400_000, today.getTime() - 3_600_000));
@@ -179,11 +316,11 @@ export function generateDemoDataset(opts: GenerateOptions = {}): Dataset {
       }
 
       // ---- disputes: carrier problem to MX/GT in the last 16 days + a few historical ones
-      const carrierIssue = (country === 'MX' || country === 'GT') && daysAgo >= 4 && daysAgo <= 16 && product.price >= 40;
-      const disputeP = carrierIssue ? 0.18 : spike ? 0.06 : 0.0025;
+      const carrierIssue = P.disputeCountries.includes(country) && daysAgo >= 4 && daysAgo <= 16 && product.price >= P.disputeMinPrice;
+      const disputeP = carrierIssue ? P.disputeRate : spike ? 0.06 : 0.0025;
       if (!pending && rand() < disputeP) {
         const reason = carrierIssue
-          ? 'MERCHANDISE_OR_SERVICE_NOT_RECEIVED'
+          ? P.disputeReason
           : spike
             ? 'MERCHANDISE_OR_SERVICE_NOT_AS_DESCRIBED'
             : pick(['UNAUTHORISED', 'MERCHANDISE_OR_SERVICE_NOT_RECEIVED', 'CREDIT_NOT_PROCESSED']);
@@ -220,7 +357,7 @@ export function generateDemoDataset(opts: GenerateOptions = {}): Dataset {
         eventCode: 'T0400',
         type: 'Transfer',
         status: 'Completed',
-        gross: -round2(3800 + rand() * 1600),
+        gross: -round2(P.payout[0] + rand() * P.payout[1]),
         fee: 0,
         net: 0,
         currency: 'USD',
@@ -239,7 +376,7 @@ export function generateDemoDataset(opts: GenerateOptions = {}): Dataset {
   const invoices: InvoiceRow[] = [];
   let n = 1040;
   for (let i = 0; i < 14; i++) {
-    const client = WHOLESALE[i % WHOLESALE.length];
+    const client = P.clients[i % P.clients.length];
     const invoiceDate = addDays(today, -Math.floor(5 + rand() * 80));
     const dueDate = addDays(invoiceDate, 30);
     const overdueDays = Math.floor((today.getTime() - dueDate.getTime()) / 86_400_000);
@@ -248,11 +385,11 @@ export function generateDemoDataset(opts: GenerateOptions = {}): Dataset {
     else status = rand() < 0.7 ? 'PAID' : 'SENT';
     invoices.push({
       invoiceId: 'INV2-' + id(4) + '-' + id(4) + '-' + id(4) + '-' + id(4),
-      invoiceNumber: `ALT-${n++}`,
+      invoiceNumber: `${P.invoicePrefix}-${n++}`,
       status,
       recipientEmail: client.email,
       recipientName: client.name,
-      amount: round2(450 + rand() * 2600),
+      amount: round2(P.invoiceRange[0] + rand() * P.invoiceRange[1]),
       currency: 'USD',
       invoiceDate: dayString(invoiceDate),
       dueDate: dayString(dueDate),
@@ -261,20 +398,20 @@ export function generateDemoDataset(opts: GenerateOptions = {}): Dataset {
   }
   // Guarantee the story: exactly three overdue invoices, one >30 days.
   const overdue = invoices.filter((x) => x.daysOverdue > 0);
-  const forced = [34, 12, 6];
-  for (let i = overdue.length; i < 3; i++) {
+  const forced = P.forcedOverdue;
+  for (let i = overdue.length; i < forced.length; i++) {
     const inv = invoices.find((x) => x.status === 'PAID' && !overdue.includes(x));
     if (!inv) break;
     overdue.push(inv);
   }
-  overdue.slice(0, 3).forEach((inv, i) => {
+  overdue.slice(0, forced.length).forEach((inv, i) => {
     const due = addDays(today, -forced[i]);
     inv.status = 'SENT';
     inv.dueDate = dayString(due);
     inv.invoiceDate = dayString(addDays(due, -30));
     inv.daysOverdue = forced[i];
   });
-  overdue.slice(3).forEach((inv) => {
+  overdue.slice(forced.length).forEach((inv) => {
     inv.status = 'PAID';
     inv.daysOverdue = 0;
   });
@@ -307,7 +444,7 @@ export function generateDemoDataset(opts: GenerateOptions = {}): Dataset {
 
   return {
     mode: 'demo',
-    merchantName: DEMO_MERCHANT,
+    merchantName: P.merchant,
     currency: 'USD',
     generatedAt: today.toISOString(),
     transactions,

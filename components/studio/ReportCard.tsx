@@ -5,7 +5,7 @@ import type { AgAiToolDetailParams } from 'ag-studio';
 
 const META: Record<string, { badge: string; cls: string; title: string; sub: string }> = {
   pdf: { badge: 'PDF', cls: 'bg-rose-100 text-rose-700', title: 'Executive report', sub: 'KPIs, charts, priorities, AI summary and audit trail' },
-  xlsx: { badge: 'XLSX', cls: 'bg-emerald-100 text-emerald-700', title: 'Excel workbook', sub: 'Summary + every table, ready for pivot tables' },
+  xlsx: { badge: 'XLSX', cls: 'bg-emerald-100 text-emerald-700', title: 'Excel workbook', sub: 'Summary, Transactions, Disputes, Invoices (4 sheets)' },
   csv: { badge: 'CSV', cls: 'bg-sky-100 text-sky-700', title: 'CSV table', sub: 'Opens in Excel, Google Sheets or any BI tool' },
   quickbooks: { badge: 'QBO', cls: 'bg-lime-100 text-lime-800', title: 'QuickBooks Online import', sub: 'Bank-statement CSV: sales, refunds and PayPal fees as separate lines' },
   xero: { badge: 'XERO', cls: 'bg-cyan-100 text-cyan-800', title: 'Xero bank statement import', sub: 'Date, amount, payee, description, reference – fees as separate lines' },

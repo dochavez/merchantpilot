@@ -66,6 +66,9 @@ services:
       # --- Optional: protects the Power BI / Excel OData feed (/api/odata) and export URLs
       - key: EXPORT_API_KEY
         sync: false
+      # --- Set to true to hide the two built-in demo businesses (portfolio shows only your PayPal apps)
+      - key: HIDE_DEMO_BUSINESSES
+        value: "false"
       # --- AG Studio trial license (baked into the client bundle at build time)
       - key: NEXT_PUBLIC_AG_STUDIO_LICENSE_KEY
         sync: false

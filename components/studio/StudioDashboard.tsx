@@ -16,12 +16,16 @@ import { INITIAL_REPORT } from './initial-report';
 import { AUTO_OPEN_PREFIXES, TOOL_DISPLAY } from './tool-display';
 import { ASK_AI_EVENT, moneyAtStakeWidget } from './MoneyAtStakeWidget';
 import { cashflowForecastWidget } from './CashflowForecastWidget';
+import { currentBusinessId } from '../business-client';
+import { makeDrillCell } from './DrillCell';
 
 const licenseKey = process.env.NEXT_PUBLIC_AG_STUDIO_LICENSE_KEY;
 if (licenseKey) AgStudioLicenseManager.setLicenseKey(licenseKey);
 
 const STUDIO_MODULES = [AgStudioAiModule];
-const STATE_KEY = 'merchantpilot.studioState.v3';
+const STATE_BASE = 'merchantpilot.studioState.v3';
+/** Each business keeps its own dashboard layout. */
+const stateKey = () => `${STATE_BASE}:${currentBusinessId()}`;
 
 /** MerchantPilot brand on top of Studio's theme (PayPal-like blues, Inter, softer cards). */
 const BRAND_PALETTE = ['#0070E0', '#F59E0B', '#10B981', '#7C3AED', '#DC2626', '#0EA5E9', '#64748B', '#EC4899'];
@@ -43,15 +47,19 @@ const THEME = (studioTheme as any).withParams({
 });
 
 /** Register the custom widget and give it its own group in Studio's widget menu. */
+const DRILL_CELLS = { invoice: makeDrillCell('invoice'), dispute: makeDrillCell('dispute'), transaction: makeDrillCell('transaction'), customer: makeDrillCell('customer') } as const;
+/** Grid columns whose field carries `context.drill` become clickable and open the detail drawer. */
+const createCellRenderer = (field: any) => DRILL_CELLS[field?.context?.drill as keyof typeof DRILL_CELLS];
+
 const WIDGETS = (w: any) => ({
   ...w,
-  widgets: [...w.widgets, moneyAtStakeWidget, cashflowForecastWidget],
+  widgets: [...w.widgets.map((d: any) => (d.id === 'grid' ? { ...d, options: { ...(d.options ?? {}), createCellRenderer } } : d)), moneyAtStakeWidget, cashflowForecastWidget],
   menu: [...w.menu, { label: 'MerchantPilot', widgetIds: ['money-at-stake', 'cashflow-forecast'] }],
 });
 
 function loadSavedState(): AgReportState | undefined {
   try {
-    const raw = localStorage.getItem(STATE_KEY);
+    const raw = localStorage.getItem(stateKey());
     return raw ? (JSON.parse(raw) as AgReportState) : undefined;
   } catch {
     return undefined;
@@ -76,7 +84,7 @@ export default function StudioDashboard({ dataset, onApi }: StudioDashboardProps
     const api = apiRef.current;
     if (!api) return;
     try {
-      localStorage.setItem(STATE_KEY, JSON.stringify(api.getState()));
+      localStorage.setItem(stateKey(), JSON.stringify(api.getState()));
     } catch {
       /* storage unavailable: fine */
     }
@@ -159,7 +167,7 @@ export default function StudioDashboard({ dataset, onApi }: StudioDashboardProps
 
 export function clearSavedDashboard() {
   try {
-    localStorage.removeItem(STATE_KEY);
+    localStorage.removeItem(stateKey());
   } catch {
     /* ignore */
   }

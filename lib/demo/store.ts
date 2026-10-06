@@ -5,20 +5,29 @@
  */
 import { generateDemoDataset, round2 } from './generate';
 import type { Dataset, TransactionRow } from '../types';
+import { currentBusiness } from '../business-context';
 
-const KEY = Symbol.for('merchantpilot.demoStore');
-type G = typeof globalThis & { [KEY]?: Dataset };
+const KEY = Symbol.for('merchantpilot.demoStores');
+type G = typeof globalThis & { [KEY]?: Map<string, Dataset> };
 
+/** One mutable demo dataset per business (each business has its own demo profile). */
 export function getDemoStore(): Dataset {
-  const g = globalThis as G;
-  if (!g[KEY]) g[KEY] = generateDemoDataset();
-  return g[KEY]!;
+  const map = ((globalThis as G)[KEY] ??= new Map());
+  const b = currentBusiness();
+  let ds = map.get(b.id);
+  if (!ds) {
+    ds = generateDemoDataset({ profile: b.profile });
+    map.set(b.id, ds);
+  }
+  return ds;
 }
 
 export function resetDemoStore(): Dataset {
-  const g = globalThis as G;
-  g[KEY] = generateDemoDataset();
-  return g[KEY]!;
+  const map = ((globalThis as G)[KEY] ??= new Map());
+  const b = currentBusiness();
+  const ds = generateDemoDataset({ profile: b.profile });
+  map.set(b.id, ds);
+  return ds;
 }
 
 function randomId() {

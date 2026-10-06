@@ -2,11 +2,12 @@ import { checkExportAuth, periodFrom } from '@/lib/export/auth';
 import { ENTITIES, findEntity, toCsv } from '@/lib/export/entities';
 import { loadReportModel } from '@/lib/export/load';
 import { reportFileName } from '@/lib/export/report-model';
+import { withBusiness } from '@/lib/businesses';
 
 export const runtime = 'nodejs';
 
 /** GET /api/export/csv/Transactions (or Disputes, Invoices, Products, …) → UTF-8 CSV. */
-export async function GET(req: Request, ctx: RouteContext<'/api/export/csv/[entity]'>) {
+async function GET_handler(req: Request, ctx: RouteContext<'/api/export/csv/[entity]'>) {
   const denied = checkExportAuth(req);
   if (denied) return denied;
   const { entity: name } = await ctx.params;
@@ -21,3 +22,5 @@ export async function GET(req: Request, ctx: RouteContext<'/api/export/csv/[enti
     },
   });
 }
+
+export const GET = withBusiness(GET_handler);

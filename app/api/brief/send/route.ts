@@ -2,6 +2,7 @@ import { listActions } from '@/lib/actions';
 import { baseUrl } from '@/lib/base-url';
 import { briefHtml, briefText, buildBrief } from '@/lib/brief';
 import { getDataset } from '@/lib/data';
+import { withBusiness } from '@/lib/businesses';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,7 +10,7 @@ export const dynamic = 'force-dynamic';
  * POST /api/brief/send – emails the brief via Resend.
  * Called by the Render cron job (Authorization: Bearer $CRON_SECRET) or from the app ("Send test").
  */
-export async function POST(req: Request) {
+async function POST_handler(req: Request) {
   const fromCron = process.env.CRON_SECRET && req.headers.get('authorization') === `Bearer ${process.env.CRON_SECRET}`;
   if (!fromCron && req.headers.get('sec-fetch-site') !== 'same-origin') return Response.json({ error: 'unauthorized' }, { status: 401 });
   const key = process.env.RESEND_API_KEY;
@@ -30,3 +31,5 @@ export async function POST(req: Request) {
   const body = await res.json().catch(() => ({}));
   return Response.json({ sent: res.ok, id: body?.id, error: res.ok ? undefined : body?.message ?? `HTTP ${res.status}` }, { status: res.ok ? 200 : 502 });
 }
+
+export const POST = withBusiness(POST_handler);

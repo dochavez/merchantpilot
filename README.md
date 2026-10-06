@@ -24,7 +24,9 @@ Small merchants live inside PayPal but can't see *why* their money moves. Refund
 6. **Fight & collect** – one click builds a **dispute evidence pack (PDF)** and, after approval, submits it through PayPal's Disputes API; overdue invoices can be offered as a **payment plan** (PayPal partial payments + reminder with the pay link).
 7. **Morning brief** – a daily summary (email via Resend, or WhatsApp) with **signed one-tap approve links** that go through the same rules and audit trail.
 8. **Everywhere** – MerchantPilot is also an **MCP server** (`/api/mcp`): ask about your PayPal business and queue actions from Claude Desktop, Cursor or any MCP client; proposals come back with signed approve links. **Voice** in Spanish/English, **real-time alerts** from PayPal webhooks (new dispute → toast → "Ask AI"), and **QuickBooks / Xero** exports for the accountant.
-9. **Share** – one click (or one sentence in the chat: *"send me this month's report"*) produces an **executive PDF** with an AI-written summary, an **Excel workbook** with every table ready for pivots, CSVs, or a **live OData feed for Power BI and Excel** that refreshes from PayPal.
+9. **Many businesses, one owner** – switch between stores or completely different businesses (each with its own PayPal app; secrets stored AES-256-GCM encrypted). The **Portfolio** page scores every business 0-100 (grade A-D, with the reason behind every point lost), consolidates sales / net / money at stake, writes an owner briefing (EN/ES), compares them in an AG Grid + AG Charts view and exports a consolidated PDF. The agent and MCP get a `portfolio_overview` tool (*"which business needs me first?"*).
+10. **Drill down** – click any invoice number, customer, dispute or transaction in the dashboard grids to open a detail drawer: invoice timeline, customer segment / lifetime value / refunds, dispute context and evidence pack, related transactions, with one-click AI actions.
+11. **Share** – one click (or one sentence in the chat: *"send me this month's report"*) produces an **executive PDF** with an AI-written summary, an **Excel workbook** with every table ready for pivots, CSVs, or a **live OData feed for Power BI and Excel** that refreshes from PayPal.
 
 ## Architecture
 
@@ -77,8 +79,8 @@ With no keys, the app runs on demo data and the chat explains how to add a model
 |---|---|
 | `npm run check:env` | Live-checks PayPal OAuth, each PayPal API, the LLM and the AG Studio license |
 | `npm run seed:sandbox` | Creates payments, refunds and overdue invoices in your PayPal sandbox (`-- --payments 100 --refunds 21 --no-invoices`) |
-| `npm test` | Unit tests: analytics, actions, LLM stream conversion, toolkit wiring |
-| `npm run e2e` | Browser test of the full agent → tool → Action Center → approve loop |
+| `npm test` | Unit tests (55): analytics, actions, LLM stream, toolkit, exports, forecast, alerts, MCP, multi-business isolation, portfolio, drill-down, Power BI feed |
+| `npm run e2e` | Browser test of the full agent → tool → Action Center → approve loop (also `e2e:exports`, `e2e:policies`, `e2e:tanda2`, `e2e:tanda3`, `e2e:tanda4`) |
 | `npm run smoke -- <url>` | Post-deploy check of a hosted instance |
 
 ## AG Studio extensions
@@ -101,7 +103,7 @@ Rules are checked when the AI proposes **and** again at approval time. With `DAT
 
 ## MCP server
 
-`POST /api/mcp` – Streamable HTTP, stateless JSON-RPC (protocol 2025-06-18 / 2025-03-26 / 2024-11-05). 16 tools: KPIs, anomalies, transactions, disputes, invoices, forecast, all `propose_*` actions, report links, pending approvals. Auth: `Authorization: Bearer $MCP_API_KEY` (required with live data; open in demo mode). Claude Desktop:
+`POST /api/mcp` – Streamable HTTP, stateless JSON-RPC (protocol 2025-06-18 / 2025-03-26 / 2024-11-05). 17 tools: KPIs, portfolio, anomalies, transactions, disputes, invoices, forecast, all `propose_*` actions, report links, pending approvals. Auth: `Authorization: Bearer $MCP_API_KEY` (required with live data; open in demo mode). Send `X-Business: <id>` to target another business. Claude Desktop:
 
 ```json
 { "mcpServers": { "merchantpilot": { "command": "npx", "args": ["-y", "mcp-remote", "https://<app>/api/mcp", "--header", "Authorization:${AUTH_HEADER}"], "env": { "AUTH_HEADER": "Bearer <MCP_API_KEY>" } } } }
@@ -112,12 +114,14 @@ Rules are checked when the AI proposes **and** again at approval time. With `DAT
 | Output | Endpoint | Notes |
 |---|---|---|
 | Executive PDF | `/api/export/pdf?days=30&lang=en` | KPIs, charts, priorities, audit trail. Summary written by the LLM from the same numbers (deterministic fallback). |
-| Excel workbook | `/api/export/xlsx?days=30` | Summary + 9 sheets as native Excel tables, currency formats, data bars, deadline highlighting. |
+| Excel workbook | `/api/export/xlsx?days=30[&mode=full]` | Default: 4 sheets (Summary with KPIs, priorities and top products; Transactions; Disputes; Invoices). `mode=full`: 10 sheets as native Excel tables for pivots. |
+| Portfolio PDF | `/api/export/portfolio-pdf?lang=es` | Consolidated report: totals, owner briefing, comparison table, one page per business. |
 | CSV | `/api/export/csv/{Transactions,Disputes,Invoices,Products,Countries,WeeklyTrend,Findings,Actions}` | UTF-8 with BOM (opens correctly in Excel). |
-| OData v4 feed | `/api/odata` (`$metadata`, `$select`, `$top`, `$skip`, `$count`) | Power BI → *Get data → OData feed*; Excel → *Data → From OData Feed*. Refreshable. |
+| OData v4 feed | `/api/odata` (`$metadata`, `$select`, `$top`, `$skip`, `$count`) | Power BI → *Get data → OData feed*; Excel → *Data → From OData Feed*. Refreshable. Every table has `BusinessId` / `BusinessName`. |
+| Portfolio feed | `/api/odata/all` | Every business stacked (composite keys `BusinessId` + key) plus a **Businesses** table with health score and grade – slice one Power BI report by business. |
 | Forecast table | `/api/odata/Forecast` | 90-day do-nothing vs with-actions projection with 80% band. |
 | QuickBooks / Xero | `/api/export/accounting?format=quickbooks\|xero\|summary` | Bank-statement CSVs (fees as separate lines) and a monthly journal summary. |
-| Power BI file | `/api/export/pbids` | Double-click to open Power BI Desktop already connected. |
+| Power BI file | `/api/export/pbids[?scope=all]` | Double-click to open Power BI Desktop already connected. |
 
 Set `EXPORT_API_KEY` to protect the feed: Power BI / Excel then use **Basic** auth (any user, the key as password); scripts can pass `?key=` or a Bearer token. Downloads started from the app itself keep working.
 
@@ -131,7 +135,11 @@ Set `EXPORT_API_KEY` to protect the feed: Power BI / Excel then use **Basic** au
 2. Click **"Why are refunds up?"**, then **"Chase overdue invoices"**.
 3. Approve a proposal **on its card in the chat** (or in the Action Center) and watch the dashboard update.
 4. Ask *"Make me a PDF report of this month"* or use **Export** → PDF / Excel / Power BI.
-5. Click **Reset demo** to start over.
+5. Click an invoice number or customer in a grid to open the detail drawer.
+6. Open the business name menu → **Portfolio overview** to compare the three demo businesses.
+7. Click **Reset demo** to start over.
+
+Step-by-step test guide (Spanish): [`docs/GUIA-PRUEBAS.es.md`](docs/GUIA-PRUEBAS.es.md) – PayPal webhook, sandbox disputes, MCP Inspector / Claude Desktop, Power BI, multi-business.
 
 ## License
 

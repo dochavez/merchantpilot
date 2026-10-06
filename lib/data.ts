@@ -6,6 +6,7 @@ import { dataMode } from './config';
 import { getDemoStore } from './demo/store';
 import { loadLiveDataset } from './paypal/live-data';
 import { getStore } from './store';
+import { currentBusiness } from './business-context';
 import type { Dataset } from './types';
 
 const KEY = Symbol.for('merchantpilot.liveCache');
@@ -18,26 +19,29 @@ export async function markInvoiceReminded(invoiceId: string) {
   await store.setSetting('invoiceReminders', map);
 }
 
-type G = typeof globalThis & { [KEY]?: { at: number; data: Promise<Dataset> } };
+type G = typeof globalThis & { [KEY]?: Map<string, { at: number; data: Promise<Dataset> }> };
 const TTL_MS = 60_000;
 
 export async function getDataset(opts: { fresh?: boolean } = {}): Promise<Dataset> {
   if (dataMode() === 'demo') return getDemoStore();
   const g = globalThis as G;
-  const c = g[KEY];
+  const caches = (g[KEY] ??= new Map());
+  const business = currentBusiness();
+  const c = caches.get(business.id);
   if (!opts.fresh && c && Date.now() - c.at < TTL_MS) return c.data;
   const data = loadLiveDataset().then(async (ds) => {
     const reminded = (await getStore().getSetting<Record<string, string>>('invoiceReminders').catch(() => undefined)) ?? {};
     for (const inv of ds.invoices) inv.lastReminderAt = reminded[inv.invoiceId] ?? inv.lastReminderAt;
+    if (business.kind === 'paypal') ds.merchantName = business.name;
     return ds;
   });
-  g[KEY] = { at: Date.now(), data };
+  caches.set(business.id, { at: Date.now(), data });
   data.catch(() => {
-    if (g[KEY]?.data === data) delete g[KEY];
+    if (caches.get(business.id)?.data === data) caches.delete(business.id);
   });
   return data;
 }
 
 export function invalidateDataset() {
-  delete (globalThis as G)[KEY];
+  (globalThis as G)[KEY]?.delete(currentBusiness().id);
 }

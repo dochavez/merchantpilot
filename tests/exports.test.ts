@@ -22,9 +22,14 @@ describe('report model', () => {
 });
 
 describe('Excel export', () => {
-  it('builds a workbook with a summary and native tables', async () => {
+  it('builds a simple 4-sheet workbook by default', async () => {
     const wb = new ExcelJS.Workbook();
     await wb.xlsx.load((await buildWorkbook(model())) as any);
+    expect(wb.worksheets.map((w) => w.name)).toEqual(['Summary', 'Transactions', 'Disputes', 'Invoices']);
+  });
+  it('builds the full workbook with native tables', async () => {
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load((await buildWorkbook(model(), 'full')) as any);
     const names = wb.worksheets.map((w) => w.name);
     expect(names).toEqual(expect.arrayContaining(['Summary', 'Findings', 'Transactions', 'Disputes', 'Invoices', 'Audit trail']));
     expect(wb.getWorksheet('Transactions')!.rowCount).toBe(getDemoStore().transactions.length + 1);

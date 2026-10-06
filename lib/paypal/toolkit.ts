@@ -9,7 +9,7 @@ import { PayPalAgentToolkit } from '@paypal/agent-toolkit/ai-sdk';
 import { config } from '../config';
 
 const KEY = Symbol.for('merchantpilot.paypalToolkit');
-type G = typeof globalThis & { [KEY]?: PayPalAgentToolkit };
+type G = typeof globalThis & { [KEY]?: Map<string, PayPalAgentToolkit> };
 
 /** Only the capabilities MerchantPilot needs (least privilege). */
 const ACTIONS = {
@@ -23,16 +23,16 @@ const ACTIONS = {
 
 export function getToolkit(): PayPalAgentToolkit {
   const g = globalThis as G;
-  if (!g[KEY]) {
-    const { clientId, clientSecret } = config.paypal;
-    if (!clientId || !clientSecret) throw new Error('PayPal credentials are not configured');
-    g[KEY] = new PayPalAgentToolkit({
-      clientId,
-      clientSecret,
-      configuration: { actions: ACTIONS, context: { sandbox: true } },
-    });
+  const map = (g[KEY] ??= new Map());
+  const { clientId, clientSecret } = config.paypal;
+  if (!clientId || !clientSecret) throw new Error('PayPal credentials are not configured');
+  // One toolkit per PayPal app (each business can have its own keys).
+  let tk = map.get(clientId);
+  if (!tk) {
+    tk = new PayPalAgentToolkit({ clientId, clientSecret, configuration: { actions: ACTIONS, context: { sandbox: true } } });
+    map.set(clientId, tk);
   }
-  return g[KEY]!;
+  return tk;
 }
 
 export async function runToolkitTool(name: string, args: Record<string, unknown>): Promise<unknown> {

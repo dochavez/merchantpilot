@@ -9,6 +9,7 @@
  */
 import type { Pool } from 'pg';
 import { dataMode } from './config';
+import { currentBusiness } from './business-context';
 import type { ProposedAction } from './types';
 
 export interface Store {
@@ -19,9 +20,17 @@ export interface Store {
   clearActions(): Promise<void>;
   getSetting<T>(key: string): Promise<T | undefined>;
   setSetting<T>(key: string, value: T): Promise<void>;
+  /** Settings shared by all businesses (e.g. the business registry). */
+  getGlobal<T>(key: string): Promise<T | undefined>;
+  setGlobal<T>(key: string, value: T): Promise<void>;
 }
 
-const ns = () => dataMode();
+/** Primary business keeps the original "live"/"demo" namespace (existing audit trails); others get their own. */
+const ns = () => {
+  const b = currentBusiness();
+  return b.id === 'primary' ? dataMode() : `biz:${b.id}`;
+};
+const GLOBAL = '_global';
 const byNewest = (a: ProposedAction, b: ProposedAction) => b.createdAt.localeCompare(a.createdAt);
 const clone = <T,>(x: T): T => (x === undefined ? x : JSON.parse(JSON.stringify(x)));
 
@@ -52,6 +61,12 @@ class MemoryStore implements Store {
   }
   async setSetting<T>(key: string, value: T) {
     this.settings.set(`${ns()}:${key}`, clone(value));
+  }
+  async getGlobal<T>(key: string) {
+    return clone(this.settings.get(`${GLOBAL}:${key}`) as T | undefined);
+  }
+  async setGlobal<T>(key: string, value: T) {
+    this.settings.set(`${GLOBAL}:${key}`, clone(value));
   }
 }
 
@@ -95,18 +110,30 @@ class PostgresStore implements Store {
     await this.ready;
     await this.pool.query('DELETE FROM mp_actions WHERE mode = $1', [ns()]);
   }
-  async getSetting<T>(key: string) {
+  private async get<T>(mode: string, key: string) {
     await this.ready;
-    const r = await this.pool.query('SELECT value FROM mp_settings WHERE mode = $1 AND key = $2', [ns(), key]);
+    const r = await this.pool.query('SELECT value FROM mp_settings WHERE mode = $1 AND key = $2', [mode, key]);
     return r.rows[0]?.value as T | undefined;
   }
-  async setSetting<T>(key: string, value: T) {
+  private async set<T>(mode: string, key: string, value: T) {
     await this.ready;
     await this.pool.query(
       `INSERT INTO mp_settings (mode, key, value, updated_at) VALUES ($1, $2, $3, now())
        ON CONFLICT (mode, key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()`,
-      [ns(), key, JSON.stringify(value)],
+      [mode, key, JSON.stringify(value)],
     );
+  }
+  getSetting<T>(key: string) {
+    return this.get<T>(ns(), key);
+  }
+  setSetting<T>(key: string, value: T) {
+    return this.set(ns(), key, value);
+  }
+  getGlobal<T>(key: string) {
+    return this.get<T>(GLOBAL, key);
+  }
+  setGlobal<T>(key: string, value: T) {
+    return this.set(GLOBAL, key, value);
   }
 }
 

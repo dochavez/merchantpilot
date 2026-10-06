@@ -1,7 +1,8 @@
 import { runAgentTool } from '@/lib/agent-tools';
 import { ActionValidationError } from '@/lib/actions';
+import { withBusiness } from '@/lib/businesses';
 
-export async function POST(req: Request, ctx: RouteContext<'/api/agent/tools/[name]'>) {
+async function POST_handler(req: Request, ctx: RouteContext<'/api/agent/tools/[name]'>) {
   const { name } = await ctx.params;
   const args = await req.json().catch(() => ({}));
   try {
@@ -12,3 +13,5 @@ export async function POST(req: Request, ctx: RouteContext<'/api/agent/tools/[na
     return Response.json({ ok: false, error: (e as Error).message }, { status });
   }
 }
+
+export const POST = withBusiness(POST_handler);

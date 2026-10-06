@@ -158,6 +158,31 @@ export function detectAnomalies(ds: Dataset, now = Date.now()): Finding[] {
     });
   }
 
+  // 5. Sales momentum: last 14 days vs the 14 before.
+  const s14 = pays.filter((p) => inLastDays(p, 14, now)).reduce((s, p) => s + p.gross, 0);
+  const p14 = pays.filter((p) => inLastDays(p, 14, now, 14)).reduce((s, p) => s + p.gross, 0);
+  if (p14 > 500 && s14 < p14 * 0.92) {
+    const drop = pct((p14 - s14) / p14);
+    const byItem = [...new Set(pays.map((p) => p.item))]
+      .map((item) => {
+        const a = pays.filter((p) => p.item === item && inLastDays(p, 14, now)).reduce((s, p) => s + p.gross, 0);
+        const b = pays.filter((p) => p.item === item && inLastDays(p, 14, now, 14)).reduce((s, p) => s + p.gross, 0);
+        return { item, change: r2(a - b) };
+      })
+      .sort((x, y) => x.change - y.change);
+    findings.push({
+      id: 'sales-decline',
+      severity: drop >= 15 ? 'high' : 'medium',
+      title: `Sales down ${drop}% in the last 14 days`,
+      detail: `${r2(s14)} ${ds.currency} vs ${r2(p14)} before. Biggest drops: ${byItem
+        .slice(0, 3)
+        .map((x) => `${x.item} (${x.change})`)
+        .join(', ')}.`,
+      evidence: { last14: r2(s14), previous14: r2(p14), dropPct: drop, byItem: byItem.slice(0, 5) },
+      suggestedActions: ['Check opening hours / stock of the products that dropped', 'Run a promotion on the slowest weekday', 'Ask returning customers for feedback'],
+    });
+  }
+
   const rank = { high: 0, medium: 1, low: 2 } as const;
   return findings.sort((a, b) => rank[a.severity] - rank[b.severity]);
 }

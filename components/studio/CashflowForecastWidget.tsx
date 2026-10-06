@@ -78,7 +78,13 @@ function CashflowForecastWidget(params: AgWidgetParams) {
     else chart.current = AgCharts.create(options);
   }, [f, view]);
 
-  useEffect(() => () => chart.current?.destroy?.(), []);
+  useEffect(
+    () => () => {
+      chart.current?.destroy?.();
+      chart.current = null;
+    },
+    [],
+  );
 
   const toggle = (label: string, on: boolean, set: (v: boolean) => void, id: string) => (
     <label style={{ display: 'inline-flex', alignItems: 'center', gap: 5, cursor: 'pointer', whiteSpace: 'nowrap' }}>

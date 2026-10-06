@@ -22,7 +22,8 @@
     "e2e:policies": "node tests/e2e/policies.mjs",
     "e2e:tanda2": "node tests/e2e/tanda2.mjs",
     "sandbox:buyer-order": "tsx scripts/sandbox-buyer-order.ts",
-    "e2e:tanda3": "node tests/e2e/tanda3.mjs"
+    "e2e:tanda3": "node tests/e2e/tanda3.mjs",
+    "e2e:tanda4": "node tests/e2e/tanda4.mjs"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^4.0.71",
@@ -30,6 +31,8 @@
     "@paypal/agent-toolkit": "^1.11.0",
     "@paypal/paypal-server-sdk": "^2.5.0",
     "ag-charts-community": "^14.2.0",
+    "ag-grid-community": "^36.2.0",
+    "ag-grid-react": "^36.2.0",
     "ag-studio": "3.0.0",
     "ag-studio-react": "3.0.0",
     "ai": "^7.0.127",

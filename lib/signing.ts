@@ -4,6 +4,7 @@
  * decision only happens on an explicit POST, so link previews / scanners can't approve anything.
  */
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
+import { currentBusiness } from './business-context';
 
 const KEY = Symbol.for('merchantpilot.signingSecret');
 type G = typeof globalThis & { [KEY]?: string };
@@ -21,12 +22,13 @@ export interface ApprovalClaim {
   d: 'approve' | 'reject';
   u: string; // approver label
   e: number; // expiry (ms)
+  b?: string; // business id
 }
 
 const b64 = (b: Buffer | string) => Buffer.from(b).toString('base64url');
 
-export function signApproval(claim: Omit<ApprovalClaim, 'e'>, ttlHours = 48): string {
-  const body = b64(JSON.stringify({ ...claim, e: Date.now() + ttlHours * 3_600_000 }));
+export function signApproval(claim: Omit<ApprovalClaim, 'e' | 'b'>, ttlHours = 48): string {
+  const body = b64(JSON.stringify({ ...claim, b: currentBusiness().id, e: Date.now() + ttlHours * 3_600_000 }));
   const sig = b64(createHmac('sha256', secret()).update(body).digest());
   return `${body}.${sig}`;
 }

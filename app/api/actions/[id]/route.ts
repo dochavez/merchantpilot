@@ -1,7 +1,8 @@
 import { ActionValidationError, decideAction } from '@/lib/actions';
+import { withBusiness } from '@/lib/businesses';
 
 /** POST { decision: 'approve' | 'reject', approver?: string } – the ONLY path that executes money-moving actions. */
-export async function POST(req: Request, ctx: RouteContext<'/api/actions/[id]'>) {
+async function POST_handler(req: Request, ctx: RouteContext<'/api/actions/[id]'>) {
   const { id } = await ctx.params;
   const body = await req.json().catch(() => ({}));
   const decision = body?.decision;
@@ -15,3 +16,5 @@ export async function POST(req: Request, ctx: RouteContext<'/api/actions/[id]'>)
     return Response.json({ error: (e as Error).message }, { status: e instanceof ActionValidationError ? 409 : 500 });
   }
 }
+
+export const POST = withBusiness(POST_handler);

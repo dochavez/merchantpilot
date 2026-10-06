@@ -17,6 +17,7 @@ const DESCRIPTIONS: Record<string, string> = {
   paypal_get_dispute: 'Full context for one dispute: transaction, customer history and recommended evidence.',
   paypal_list_invoices: 'List invoices; overdueOnly=true for unpaid invoices past due, with totals by customer.',
   paypal_list_actions: 'Actions already proposed / approved / executed (audit trail).',
+  portfolio_overview: 'All businesses side by side: health score (0-100) with reasons, sales, refunds, money at stake, 30-day forecast upside, top issues, plus consolidated totals and cross-business insights. Other tools act on one business: pass ?business=<id> in the MCP URL or the X-Business header.',
   paypal_forecast: 'Cash-flow forecast for the next N days with an optional what-if scenario (fixRefundSpike, collectOverdue, fightDisputes, salesChangePct). Returns baseline vs scenario, upside per lever and drivers.',
   propose_refund: 'PROPOSE a refund (does not move money). Returns a signed approval link; executes only after the merchant approves.',
   propose_invoice_reminder: 'PROPOSE a payment reminder for an unpaid invoice. Needs merchant approval unless their rules auto-approve reminders.',

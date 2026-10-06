@@ -31,6 +31,7 @@ const schemas = {
   paypal_get_dispute: z.object({ disputeId: str }),
   paypal_list_invoices: z.object({ overdueOnly: z.boolean().optional(), status: z.string().optional() }),
   paypal_list_actions: z.object({}).passthrough(),
+  portfolio_overview: z.object({}).passthrough(),
   paypal_forecast: z.object({
     days: z.number().int().min(7).max(120).optional(),
     fixRefundSpike: z.boolean().optional(),
@@ -92,6 +93,16 @@ export async function runAgentTool(name: string, rawArgs: unknown): Promise<unkn
     }
     case 'propose_payment_plan':
       return pending(await proposeAction({ kind: 'payment_plan', data: { invoiceId: args.invoiceId, installments: args.installments, note: args.note }, rationale: args.rationale }));
+    case 'portfolio_overview': {
+      const { buildPortfolio } = await import('./portfolio');
+      const p = await buildPortfolio();
+      return {
+        totals: p.totals,
+        businesses: p.businesses.map((b) => ({ id: b.id, name: b.name, mode: b.mode, error: b.error, health: b.health, sales30: b.kpis?.grossSales, salesChangePct: b.kpis?.salesChangePct, refundRatePct: b.kpis?.refundRatePct, netRevenue30: b.kpis?.netRevenue, moneyAtStake: b.moneyAtStake, forecastUpside30: b.forecast30?.upside, topFindings: b.topFindings, pendingApprovals: b.pendingApprovals })),
+        insights: p.insights,
+        note: 'Numbers per business, last 30 days. Quote them verbatim. Other tools work on the business currently selected in the dashboard; the owner switches business with the selector at the top or opens the Portfolio page.',
+      };
+    }
     case 'paypal_forecast': {
       const f = forecastCashflow(ds, { days: args.days ?? 60, scenario: args });
       // Weekly checkpoints only (keeps tokens low); the chart on the Forecast page shows every day.

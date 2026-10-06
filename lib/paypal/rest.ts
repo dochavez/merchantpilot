@@ -11,7 +11,7 @@ interface TokenCache {
 }
 
 const KEY = Symbol.for('merchantpilot.paypalToken');
-type G = typeof globalThis & { [KEY]?: TokenCache };
+type G = typeof globalThis & { [KEY]?: Map<string, TokenCache> };
 
 export class PayPalApiError extends Error {
   constructor(
@@ -25,11 +25,12 @@ export class PayPalApiError extends Error {
 
 export async function getAccessToken(): Promise<string> {
   const g = globalThis as G;
-  const cached = g[KEY];
-  if (cached && cached.expiresAt > Date.now() + 60_000) return cached.token;
-
+  const cache = (g[KEY] ??= new Map());
   const { clientId, clientSecret, baseUrl } = config.paypal;
   if (!clientId || !clientSecret) throw new Error('PayPal credentials are not configured');
+  // One token per PayPal app (each business can have its own).
+  const cached = cache.get(clientId);
+  if (cached && cached.expiresAt > Date.now() + 60_000) return cached.token;
 
   const res = await fetch(`${baseUrl}/v1/oauth2/token`, {
     method: 'POST',
@@ -44,7 +45,7 @@ export async function getAccessToken(): Promise<string> {
   if (!res.ok) {
     throw new PayPalApiError(`PayPal OAuth failed (${res.status}): ${body.error_description ?? body.error ?? 'unknown'}`, res.status, body);
   }
-  g[KEY] = { token: body.access_token, expiresAt: Date.now() + (body.expires_in ?? 3000) * 1000 };
+  cache.set(clientId, { token: body.access_token, expiresAt: Date.now() + (body.expires_in ?? 3000) * 1000 });
   return body.access_token;
 }
 

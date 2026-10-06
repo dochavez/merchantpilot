@@ -26,7 +26,7 @@ try {
   await page.getByTestId('export-menu').click();
   const pdf = await expectDownload(() => page.getByText('Executive report').click(), '.pdf');
   await page.getByTestId('export-menu').click();
-  const xlsx = await expectDownload(() => page.getByText('Excel workbook').click(), '.xlsx');
+  const xlsx = await expectDownload(() => page.getByText('Excel (simple)').click(), '.xlsx');
   await page.getByTestId('export-menu').click();
   await page.getByText('Connect Power BI / Excel (live)').click();
   await page.getByRole('dialog', { name: 'Connect Power BI or Excel' }).waitFor();

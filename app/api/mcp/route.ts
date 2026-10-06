@@ -6,6 +6,7 @@
 import { baseUrl } from '@/lib/base-url';
 import { dataMode } from '@/lib/config';
 import { handleRpc } from '@/lib/mcp';
+import { withBusiness } from '@/lib/businesses';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,7 +14,7 @@ function unauthorized(msg: string) {
   return Response.json({ jsonrpc: '2.0', id: null, error: { code: -32001, message: msg } }, { status: 401, headers: { 'WWW-Authenticate': 'Bearer realm="merchantpilot-mcp"' } });
 }
 
-export async function POST(req: Request) {
+async function POST_handler(req: Request) {
   const key = process.env.MCP_API_KEY;
   if (key) {
     if (req.headers.get('authorization') !== `Bearer ${key}`) return unauthorized('Invalid or missing bearer token');
@@ -36,6 +37,9 @@ export async function POST(req: Request) {
 }
 
 /** No server-initiated stream: GET returns 405 as allowed by the Streamable HTTP spec. */
-export async function GET() {
+async function GET_handler() {
   return new Response('MerchantPilot MCP endpoint: POST JSON-RPC here (Streamable HTTP, JSON responses).', { status: 405, headers: { Allow: 'POST' } });
 }
+
+export const POST = withBusiness(POST_handler);
+export const GET = withBusiness(GET_handler);

@@ -5,6 +5,8 @@
  * Server-only: never import this from a client component.
  */
 
+import { currentBusiness } from './business-context';
+
 export type DataMode = 'live' | 'demo';
 export type LlmProvider = 'openai' | 'anthropic' | 'mock' | 'none';
 
@@ -13,14 +15,33 @@ function env(name: string): string | undefined {
   return v && v.trim() !== '' ? v.trim() : undefined;
 }
 
-export const config = {
-  paypal: {
-    clientId: env('PAYPAL_CLIENT_ID'),
-    // Accept both names: the official boilerplate uses PAYPAL_SECRET.
-    clientSecret: env('PAYPAL_CLIENT_SECRET') ?? env('PAYPAL_SECRET'),
-    baseUrl: env('PAYPAL_API_BASE') ?? 'https://api-m.sandbox.paypal.com',
-    webhookId: env('PAYPAL_WEBHOOK_ID'),
+/**
+ * PayPal settings resolve per business (see business-context.ts): the primary business uses the
+ * env keys, owner-added businesses use their own (encrypted) sandbox app keys, demo businesses none.
+ */
+const paypal = {
+  get clientId(): string | undefined {
+    const b = currentBusiness();
+    if (b.kind === 'paypal') return b.creds?.clientId;
+    return b.kind === 'primary' ? env('PAYPAL_CLIENT_ID') : undefined;
   },
+  get clientSecret(): string | undefined {
+    const b = currentBusiness();
+    if (b.kind === 'paypal') return b.creds?.clientSecret;
+    // Accept both names: the official boilerplate uses PAYPAL_SECRET.
+    return b.kind === 'primary' ? (env('PAYPAL_CLIENT_SECRET') ?? env('PAYPAL_SECRET')) : undefined;
+  },
+  get baseUrl(): string {
+    const b = currentBusiness();
+    return (b.kind === 'paypal' ? b.creds?.baseUrl : undefined) ?? env('PAYPAL_API_BASE') ?? 'https://api-m.sandbox.paypal.com';
+  },
+  get webhookId(): string | undefined {
+    return currentBusiness().kind === 'primary' ? env('PAYPAL_WEBHOOK_ID') : undefined;
+  },
+};
+
+export const config = {
+  paypal,
   llm: {
     openaiKey: env('OPENAI_API_KEY'),
     anthropicKey: env('ANTHROPIC_API_KEY'),
@@ -40,6 +61,9 @@ export function hasPayPalCredentials(): boolean {
 }
 
 export function dataMode(): DataMode {
+  const b = currentBusiness();
+  if (b.kind === 'demo') return 'demo';
+  if (b.kind === 'paypal') return 'live';
   return hasPayPalCredentials() && !config.forceDemo ? 'live' : 'demo';
 }
 

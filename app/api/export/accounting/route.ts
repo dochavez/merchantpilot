@@ -1,11 +1,12 @@
 import { quickbooksCsv, summaryCsv, xeroCsv } from '@/lib/export/accounting';
 import { checkExportAuth } from '@/lib/export/auth';
 import { getDataset } from '@/lib/data';
+import { withBusiness } from '@/lib/businesses';
 
 export const runtime = 'nodejs';
 
 /** GET /api/export/accounting?format=quickbooks|xero|summary&days=90 → CSV ready to import. */
-export async function GET(req: Request) {
+async function GET_handler(req: Request) {
   const denied = checkExportAuth(req);
   if (denied) return denied;
   const q = new URL(req.url).searchParams;
@@ -16,3 +17,5 @@ export async function GET(req: Request) {
   const name = `paypal-${format}-${new Date().toISOString().slice(0, 10)}.csv`;
   return new Response(body, { headers: { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="${name}"`, 'Cache-Control': 'no-store' } });
 }
+
+export const GET = withBusiness(GET_handler);

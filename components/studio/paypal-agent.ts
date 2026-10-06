@@ -62,7 +62,7 @@ function buildPayPalTools(api: AgStudioApi): AgAiTool[] {
   const createReport: AgAiTool = api.defineAiTool({
     name: 'create_report',
     description:
-      'Prepare a downloadable report for the merchant: "pdf" (executive report with charts and an AI summary), "xlsx" (Excel workbook with all data as tables), "csv" (one table), "powerbi" (live connection for Power BI / Excel), or "quickbooks" / "xero" (bank-statement CSV for the accountant, fees as separate lines). Returns a link; a download card appears in the chat.',
+      'Prepare a downloadable report for the merchant: "pdf" (executive report with charts and an AI summary), "xlsx" (Excel: summary, transactions, disputes, invoices), "csv" (one table), "powerbi" (live connection for Power BI / Excel), or "quickbooks" / "xero" (bank-statement CSV for the accountant, fees as separate lines). Returns a link; a download card appears in the chat.',
     params: (s: any) =>
       s.object({
         format: s.enum(['pdf', 'xlsx', 'csv', 'powerbi', 'quickbooks', 'xero']),
@@ -127,6 +127,11 @@ function buildPayPalTools(api: AgStudioApi): AgAiTool[] {
           fightDisputes: s.boolean().optional(),
           salesChangePct: s.number({ description: 'e.g. 10 for +10% sales, -20 for -20%' }).optional(),
         }),
+    ),
+    define(
+      'portfolio_overview',
+      'Compare ALL the owner\'s businesses: health score with reasons, sales, refund rate, money at stake, forecast upside, top issues, consolidated totals and insights. Use when the owner asks about "my businesses", which one needs attention, or totals across them.',
+      (s) => s.object({}),
     ),
     define('paypal_list_actions', 'List actions already proposed/approved/executed in the Action Center, to avoid duplicates and report outcomes.', (s) => s.object({})),
     define(
@@ -196,6 +201,7 @@ How you work:
 4. Money-moving actions are NEVER executed by you. Use propose_refund, propose_invoice_reminder, propose_accept_dispute or draft_dispute_response. They only queue a proposal. Each proposal appears as a card with Approve/Reject buttons right under your message (and in the Action Center). The merchant's approval rules (⚖ Rules in the Action Center) may auto-execute small actions or require two approvers: read the status and note in each tool result and report exactly that ("done automatically under your rules", "needs a second approver", or "approve or reject it on the card"). Never claim something executed unless the result says executed. Do not repeat the card's details at length.
 5. Before proposing a refund, look up the payment with paypal_find_transactions to get the exact transactionId. Prefer few, high-value, well-justified proposals (max 5 at once) and give each a data-backed rationale.
 6. For disputes: accept only when evidence favours the buyer (e.g. confirmed damaged batch); otherwise call paypal_get_dispute and then propose_dispute_evidence with a factual seller statement and the evidence list (this submits a PDF evidence pack after approval). Mention deadlines. For large or very late invoices, prefer propose_payment_plan (installments) over a plain reminder.
+7a. Several businesses: the owner may run more than one business. For questions across businesses (which one is doing worst, totals, comparisons) call portfolio_overview and quote its numbers; mention the Portfolio page for the full comparison.
 7. Forecasts / what-if: for questions about future cash, "what happens if…" or "how much is fixing X worth", call paypal_forecast (once without a scenario and once with the relevant scenario flags if useful), quote baseline, scenario and upside, and mention the "Cash-flow forecast" widget on the dashboard where they can toggle the same scenarios.
 7b. Reports: when the merchant wants a report, a file, Excel, PDF, CSV or Power BI, call create_report (pdf by default; use language 'es' if they write in Spanish). A download card appears under your message.
 8. Be concise. End with 1-3 suggested next steps.

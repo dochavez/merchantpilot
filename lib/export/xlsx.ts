@@ -61,7 +61,14 @@ function addTableSheet(
   return ws;
 }
 
-export async function buildWorkbook(m: ReportModel): Promise<Buffer> {
+export type WorkbookMode = 'simple' | 'full';
+
+/**
+ * mode 'simple' (default): 4 sheets — Summary (KPIs + what needs attention + top products), Transactions,
+ * Disputes, Invoices. mode 'full': adds Findings, Weekly, Products, Countries, Audit trail and About.
+ */
+export async function buildWorkbook(m: ReportModel, mode: WorkbookMode = 'simple'): Promise<Buffer> {
+  const full = mode === 'full';
   const wb = new ExcelJS.Workbook();
   wb.creator = 'MerchantPilot';
   wb.created = new Date(m.generatedAt);
@@ -130,8 +137,34 @@ export async function buildWorkbook(m: ReportModel): Promise<Buffer> {
     r.getCell(3).alignment = { wrapText: true, vertical: 'top' };
   });
 
+  if (!full) {
+    const pRow = fRow + 2 + Math.min(8, m.findings.length);
+    s.getCell(`A${pRow}`).value = 'Top products';
+    s.getCell(`A${pRow}`).font = { bold: true, size: 12 };
+    const ph = s.getRow(pRow + 1);
+    ph.values = ['Product', 'Sales', 'Refunds', 'Refund rate'];
+    ph.font = { bold: true, color: { argb: MUTED } };
+    [...m.products].sort((a: any, b: any) => b.sales - a.sales).slice(0, 8).forEach((p: any, i) => {
+      const r = s.getRow(pRow + 2 + i);
+      r.getCell(1).value = p.item;
+      r.getCell(2).value = p.sales;
+      r.getCell(2).numFmt = moneyFmt(cur);
+      r.getCell(3).value = p.refunds;
+      r.getCell(3).numFmt = moneyFmt(cur);
+      r.getCell(4).value = p.refundRatePct;
+      r.getCell(4).numFmt = '0.0"%"';
+      if (p.refundRatePct > 5) r.getCell(4).font = { bold: true, color: { argb: 'FFB91C1C' } };
+    });
+    const nRow = pRow + 11;
+    s.mergeCells(`A${nRow}:E${nRow}`);
+    s.getCell(`A${nRow}`).value = 'Detail sheets: Transactions, Disputes (red = respond within 5 days) and Invoices (red = over 30 days late). Need weekly, product, country and audit-trail sheets too? Use Export → "Excel (full workbook)".';
+    s.getCell(`A${nRow}`).font = { size: 9, color: { argb: MUTED } };
+    s.getCell(`A${nRow}`).alignment = { wrapText: true };
+    s.getRow(nRow).height = 28;
+  }
+
   /* ---------------------------------------------------------------- Detail sheets */
-  addTableSheet(
+  if (full) addTableSheet(
     wb,
     'Findings',
     [
@@ -144,7 +177,7 @@ export async function buildWorkbook(m: ReportModel): Promise<Buffer> {
     cur,
     { highlight: (r) => (r.severity === 'high' ? RED : undefined) },
   );
-  addTableSheet(
+  if (full) addTableSheet(
     wb,
     'Weekly',
     [
@@ -158,7 +191,7 @@ export async function buildWorkbook(m: ReportModel): Promise<Buffer> {
     cur,
     { dataBar: ['sales'] },
   );
-  addTableSheet(
+  if (full) addTableSheet(
     wb,
     'Products',
     [
@@ -173,7 +206,7 @@ export async function buildWorkbook(m: ReportModel): Promise<Buffer> {
     cur,
     { dataBar: ['sales', 'refundRatePct'] },
   );
-  addTableSheet(
+  if (full) addTableSheet(
     wb,
     'Countries',
     [
@@ -244,7 +277,7 @@ export async function buildWorkbook(m: ReportModel): Promise<Buffer> {
     cur,
     { highlight: (r) => (Number(r.daysOverdue) > 30 ? RED : Number(r.daysOverdue) > 0 ? AMBER : undefined) },
   );
-  addTableSheet(
+  if (full) addTableSheet(
     wb,
     'Audit trail',
     [
@@ -263,6 +296,7 @@ export async function buildWorkbook(m: ReportModel): Promise<Buffer> {
     cur,
   );
 
+  if (full) {
   const about = wb.addWorksheet('About');
   about.columns = [{ width: 110 }];
   [
@@ -279,6 +313,7 @@ export async function buildWorkbook(m: ReportModel): Promise<Buffer> {
     c.alignment = { wrapText: true };
     if (i === 0) c.font = { bold: true, size: 14 };
   });
+  }
 
   return Buffer.from(await wb.xlsx.writeBuffer());
 }
