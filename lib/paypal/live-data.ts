@@ -4,7 +4,9 @@
  * REST app) becomes a warning instead of breaking the dashboard.
  */
 import { paypalGet } from './rest';
-import type { Dataset, DisputeRow, DisputeStatus, InvoiceRow, InvoiceStatus, TransactionRow, TxStatus, TxType } from '../types';
+import type { Dataset, DisputeRow, DisputeStatus, InvoiceItem, InvoiceRow, InvoiceStatus, SubscriptionRow, SubscriptionStatus, TransactionRow, TxStatus, TxType } from '../types';
+import { getStore } from '../store';
+import { monthlyValueOf } from '../analytics';
 
 const DAY = 86_400_000;
 
@@ -46,6 +48,8 @@ export function normalizeTransaction(t: any): TransactionRow {
     [payer.payer_name?.given_name, payer.payer_name?.surname].filter(Boolean).join(' ') ??
     '';
   const datetime = info.transaction_initiation_date ?? new Date().toISOString();
+  // Recurring charges reference their subscription (I-…) instead of another transaction.
+  const isSub = info.paypal_reference_id_type === 'SUB' || (info.transaction_event_code === 'T0002' && /^I-/.test(info.paypal_reference_id ?? ''));
   return {
     transactionId: info.transaction_id,
     date: datetime.slice(0, 10),
@@ -61,9 +65,10 @@ export function normalizeTransaction(t: any): TransactionRow {
     customerName: name || t.shipping_info?.name || '',
     country: t.shipping_info?.address?.country_code ?? payer.country_code ?? '',
     instrument: info.instrument_sub_type ?? info.instrument_type ?? 'PayPal',
-    item: t.cart_info?.item_details?.[0]?.item_name ?? info.transaction_subject ?? info.transaction_note ?? '',
-    relatedTransactionId: info.paypal_reference_id,
+    item: t.cart_info?.item_details?.[0]?.item_name ?? info.transaction_subject ?? info.transaction_note ?? (isSub ? 'Subscription payment' : ''),
+    relatedTransactionId: isSub ? undefined : info.paypal_reference_id,
     invoiceId: info.invoice_id,
+    ...(isSub ? { subscriptionId: info.paypal_reference_id } : {}),
   };
 }
 
@@ -139,7 +144,24 @@ export function normalizeInvoice(inv: any, now = Date.now()): InvoiceRow {
     invoiceDate: detail.invoice_date ?? '',
     dueDate: due,
     daysOverdue: unpaid && due ? Math.max(0, Math.floor((now - Date.parse(due)) / DAY)) : 0,
+    ...(Array.isArray(inv.items) && inv.items.length ? { items: invoiceItems(inv.items) } : {}),
+    ...(detail.reference ? { itemsSummary: String(detail.reference).slice(0, 200) } : {}),
   };
+}
+
+export function invoiceItems(items: any[]): InvoiceItem[] {
+  return items.map((it) => {
+    const quantity = num(it.quantity) || 1;
+    const unitPrice = num(it.unit_amount?.value);
+    const discount = num(it.discount?.amount?.value);
+    return { name: String(it.name ?? 'Item'), quantity, unitPrice, total: Math.round((quantity * unitPrice - discount) * 100) / 100 };
+  });
+}
+
+/** Full invoice with line items (the list endpoint does not include them). */
+export async function fetchLiveInvoiceItems(invoiceId: string): Promise<InvoiceItem[]> {
+  const inv = await paypalGet(`/v2/invoicing/invoices/${encodeURIComponent(invoiceId)}`);
+  return invoiceItems(inv.items ?? []);
 }
 
 export async function fetchLiveInvoices(): Promise<InvoiceRow[]> {
@@ -151,6 +173,89 @@ export async function fetchLiveInvoices(): Promise<InvoiceRow[]> {
     if (items.length < 100 || (body.total_pages && page >= body.total_pages)) break;
   }
   return rows;
+}
+
+/* ------------------------------------------------------------------ subscriptions */
+
+const SUB_STATUSES: SubscriptionStatus[] = ['APPROVAL_PENDING', 'APPROVED', 'ACTIVE', 'SUSPENDED', 'CANCELLED', 'EXPIRED'];
+const planCache = new Map<string, any>();
+
+export function normalizeSubscription(sub: any, plan: any): SubscriptionRow {
+  const regular = (plan?.billing_cycles ?? []).find((c: any) => c.tenure_type === 'REGULAR') ?? plan?.billing_cycles?.[0] ?? {};
+  const price = num(regular.pricing_scheme?.fixed_price?.value ?? sub.billing_info?.last_payment?.amount?.value);
+  const unit = String(regular.frequency?.interval_unit ?? 'MONTH').toUpperCase() as SubscriptionRow['interval'];
+  const count = num(regular.frequency?.interval_count) || 1;
+  const status = (SUB_STATUSES.includes(sub.status) ? sub.status : 'ACTIVE') as SubscriptionStatus;
+  const name = sub.subscriber?.name;
+  const qty = num(sub.quantity) || 1;
+  const row: SubscriptionRow = {
+    subscriptionId: sub.id,
+    planId: sub.plan_id ?? plan?.id ?? '',
+    planName: plan?.name ?? sub.plan_id ?? 'Subscription',
+    status,
+    subscriberName: [name?.given_name, name?.surname].filter(Boolean).join(' '),
+    subscriberEmail: sub.subscriber?.email_address ?? '',
+    country: sub.subscriber?.shipping_address?.address?.country_code,
+    amount: Math.round(price * qty * 100) / 100,
+    currency: regular.pricing_scheme?.fixed_price?.currency_code ?? sub.billing_info?.last_payment?.amount?.currency_code ?? 'USD',
+    interval: ['DAY', 'WEEK', 'MONTH', 'YEAR'].includes(unit) ? unit : 'MONTH',
+    intervalCount: count,
+    monthlyValue: 0,
+    startDate: String(sub.start_time ?? sub.create_time ?? '').slice(0, 10),
+    nextBillingDate: sub.billing_info?.next_billing_time?.slice(0, 10),
+    lastPaymentDate: sub.billing_info?.last_payment?.time?.slice(0, 10),
+    lastPaymentAmount: sub.billing_info?.last_payment?.amount ? num(sub.billing_info.last_payment.amount.value) : undefined,
+    failedPayments: num(sub.billing_info?.failed_payments_count),
+    cancelledDate: status === 'CANCELLED' || status === 'EXPIRED' ? String(sub.status_update_time ?? '').slice(0, 10) || undefined : undefined,
+  };
+  row.monthlyValue = status === 'ACTIVE' ? monthlyValueOf(row) : 0;
+  return row;
+}
+
+/** Subscription ids MerchantPilot has seen (webhooks + the seed script), per business. */
+export async function trackedSubscriptionIds(): Promise<string[]> {
+  return (await getStore().getSetting<string[]>('subscriptionIds')) ?? [];
+}
+
+export async function trackSubscriptionId(id: string) {
+  if (!/^I-[A-Z0-9]{6,30}$/.test(id)) return;
+  const ids = await trackedSubscriptionIds();
+  if (!ids.includes(id)) await getStore().setSetting('subscriptionIds', [id, ...ids].slice(0, 500));
+}
+
+/**
+ * PayPal has no "list all subscriptions" endpoint, so ids come from recurring payments in
+ * Transaction Search plus the ids MerchantPilot tracked from webhooks. Each one is read with
+ * GET /v1/billing/subscriptions/{id} and its plan (cached) for name and price.
+ */
+export async function fetchLiveSubscriptions(transactions: TransactionRow[]): Promise<SubscriptionRow[]> {
+  const ids = [...new Set([...(await trackedSubscriptionIds()), ...transactions.map((t) => t.subscriptionId).filter((x): x is string => !!x)])].slice(0, 120);
+  const out: SubscriptionRow[] = [];
+  for (let i = 0; i < ids.length; i += 6) {
+    const batch = await Promise.all(
+      ids.slice(i, i + 6).map(async (id) => {
+        try {
+          const sub = await paypalGet(`/v1/billing/subscriptions/${encodeURIComponent(id)}`);
+          let plan = planCache.get(sub.plan_id);
+          if (!plan && sub.plan_id) {
+            plan = await paypalGet(`/v1/billing/plans/${encodeURIComponent(sub.plan_id)}`).catch(() => null);
+            if (plan) planCache.set(sub.plan_id, plan);
+          }
+          return normalizeSubscription(sub, plan);
+        } catch {
+          return null;
+        }
+      }),
+    );
+    out.push(...batch.filter((x): x is SubscriptionRow => !!x));
+  }
+  // Name recurring payments after their plan.
+  const byId = new Map(out.map((s) => [s.subscriptionId, s]));
+  for (const t of transactions) {
+    const s = t.subscriptionId ? byId.get(t.subscriptionId) : undefined;
+    if (s && (!t.item || t.item === 'Subscription payment')) t.item = s.planName;
+  }
+  return out.sort((a, b) => b.startDate.localeCompare(a.startDate));
 }
 
 export async function loadLiveDataset(): Promise<Dataset> {
@@ -168,6 +273,10 @@ export async function loadLiveDataset(): Promise<Dataset> {
     settle('Disputes', fetchLiveDisputes()),
     settle('Invoices', fetchLiveInvoices()),
   ]);
+  const subscriptions = await fetchLiveSubscriptions(transactions).catch((e) => {
+    warnings.push(`Subscriptions: ${(e as Error).message}`);
+    return [] as SubscriptionRow[];
+  });
   return {
     mode: 'live',
     merchantName: process.env.MERCHANT_NAME ?? 'Your PayPal sandbox business',
@@ -176,6 +285,7 @@ export async function loadLiveDataset(): Promise<Dataset> {
     transactions,
     disputes,
     invoices,
+    subscriptions,
     warnings,
   };
 }

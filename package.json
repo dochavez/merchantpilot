@@ -23,7 +23,8 @@
     "e2e:tanda2": "node tests/e2e/tanda2.mjs",
     "sandbox:buyer-order": "tsx scripts/sandbox-buyer-order.ts",
     "e2e:tanda3": "node tests/e2e/tanda3.mjs",
-    "e2e:tanda4": "node tests/e2e/tanda4.mjs"
+    "e2e:tanda4": "node tests/e2e/tanda4.mjs",
+    "sandbox:subscription": "tsx scripts/sandbox-subscription.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^4.0.71",

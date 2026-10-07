@@ -8,7 +8,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { ASK_AI_EVENT } from './studio/MoneyAtStakeWidget';
 
 export const OPEN_DETAIL_EVENT = 'merchantpilot:open-detail';
-export type DetailKind = 'invoice' | 'dispute' | 'transaction' | 'customer';
+export type DetailKind = 'invoice' | 'dispute' | 'transaction' | 'customer' | 'subscription';
 
 export function openDetail(kind: DetailKind, id: string) {
   window.dispatchEvent(new CustomEvent(OPEN_DETAIL_EVENT, { detail: { kind, id } }));
@@ -121,6 +121,30 @@ function Body({ d }: { d: any }) {
           <Row k="Last reminder" v={i.lastReminderAt ? i.lastReminderAt.slice(0, 16).replace('T', ' ') : 'never'} />
           <Row k="Payment plan" v={i.paymentPlan ? `${i.paymentPlan.installments} × ${money(i.paymentPlan.minimumAmountDue, i.currency)}` : 'none'} />
         </Section>
+        {i.items?.length > 0 && (
+          <Section title="Products on this invoice">
+            <table className="w-full text-xs" data-testid="invoice-items">
+              <thead>
+                <tr className="text-left text-[10px] uppercase text-[var(--muted)]">
+                  <th className="py-1 font-medium">Item</th>
+                  <th className="py-1 text-right font-medium">Qty</th>
+                  <th className="py-1 text-right font-medium">Unit</th>
+                  <th className="py-1 text-right font-medium">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {i.items.map((l: any, n: number) => (
+                  <tr key={n} className="border-t border-[var(--line)]">
+                    <td className="py-1 pr-2">{l.name}</td>
+                    <td className="py-1 text-right">{l.quantity}</td>
+                    <td className="py-1 text-right">{money(l.unitPrice, i.currency)}</td>
+                    <td className={`py-1 text-right ${l.total < 0 ? 'text-emerald-700' : ''}`}>{money(l.total, i.currency)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </Section>
+        )}
         <Section title="Customer">
           <Row k="Name" v={<Link_ kind="customer" id={i.recipientEmail || i.recipientName}>{i.recipientName}</Link_>} />
           <Row k="Email" v={i.recipientEmail} />
@@ -196,6 +220,45 @@ function Body({ d }: { d: any }) {
       </>
     );
   }
+  if (d.kind === 'subscription') {
+    const x = d.subscription;
+    const tone = x.status === 'ACTIVE' ? 'bg-emerald-100 text-emerald-800' : x.status === 'SUSPENDED' ? 'bg-rose-100 text-rose-800' : 'bg-zinc-100 text-zinc-700';
+    const every = `${x.intervalCount > 1 ? x.intervalCount + ' ' : ''}${x.interval.toLowerCase()}${x.intervalCount > 1 ? 's' : ''}`;
+    return (
+      <>
+        <div className="flex items-baseline justify-between">
+          <span className="text-2xl font-bold">
+            {money(x.amount, x.currency)} <span className="text-sm font-normal text-[var(--muted)]">/ {every}</span>
+          </span>
+          <span className={`rounded px-2 py-0.5 text-[11px] font-semibold ${tone}`}>{x.status}</span>
+        </div>
+        <Section title="Subscription">
+          <Row k="ID" v={<span className="font-mono text-[10px]">{x.subscriptionId}</span>} />
+          <Row k="Plan" v={x.planName} />
+          <Row k="Monthly value (MRR)" v={money(d.monthlyValue, x.currency)} />
+          <Row k="Started / tenure" v={`${x.startDate} · ${d.tenureMonths} months`} />
+          {x.nextBillingDate && <Row k="Next billing" v={x.nextBillingDate} />}
+          {x.lastPaymentDate && <Row k="Last payment" v={`${x.lastPaymentDate} · ${money(x.lastPaymentAmount ?? x.amount, x.currency)}`} />}
+          {x.failedPayments > 0 && <Row k="Failed payments" v={<span className="font-semibold text-rose-700">{x.failedPayments}</span>} />}
+          {x.cancelledDate && <Row k="Cancelled" v={x.cancelledDate} />}
+          <Row k="Paid in the last 90 days" v={money(d.paidInPeriod, x.currency)} />
+        </Section>
+        <Section title="Subscriber">
+          {d.customer ? <CustomerBlock c={d.customer} /> : <Row k="Subscriber" v={`${x.subscriberName} · ${x.subscriberEmail}`} />}
+        </Section>
+        {d.payments.length > 0 && (
+          <Section title="Recurring payments">
+            <TxList rows={d.payments} />
+          </Section>
+        )}
+        <div className="mt-4 flex flex-wrap gap-2">
+          {x.status === 'SUSPENDED' && <Ask label="Recover this subscriber" prompt={`Subscription ${x.subscriptionId} (${x.planName}, ${x.subscriberEmail}) is suspended after ${x.failedPayments} failed payment(s). Write the message to update the payment method and tell me how much MRR it recovers.`} />}
+          {x.status === 'CANCELLED' && <Ask label="Win them back" prompt={`Subscriber ${x.subscriberName} cancelled ${x.planName} on ${x.cancelledDate}. Using the data, suggest a win-back offer and write the message.`} />}
+          {x.status === 'ACTIVE' && <Ask label="Upsell idea" prompt={`Suggest an upsell or plan upgrade for subscriber ${x.subscriberName} on ${x.planName}, using their purchase history.`} />}
+        </div>
+      </>
+    );
+  }
   if (d.kind === 'transaction') {
     const t = d.transaction;
     return (
@@ -210,6 +273,7 @@ function Body({ d }: { d: any }) {
           <Row k="ID" v={<span className="font-mono text-[10px]">{t.transactionId}</span>} />
           <Row k="Date" v={t.datetime.replace('T', ' ').slice(0, 16)} />
           <Row k="Product" v={t.item} />
+          {t.subscriptionId && <Row k="Subscription" v={<Link_ kind="subscription" id={t.subscriptionId} />} />}
           <Row k="Fee / net" v={`${money(t.fee, t.currency)} / ${money(t.net, t.currency)}`} />
           <Row k="Payment method" v={t.instrument} />
           <Row k="Country" v={t.country} />
@@ -276,6 +340,13 @@ function Body({ d }: { d: any }) {
           ))}
         </Section>
       )}
+      {c.subscriptions?.length > 0 && (
+        <Section title="Subscriptions">
+          {c.subscriptions.map((x: any) => (
+            <Row key={x.subscriptionId} k={`${x.planName} · ${x.status}`} v={<Link_ kind="subscription" id={x.subscriptionId}>{money(x.amount, x.currency)}</Link_>} />
+          ))}
+        </Section>
+      )}
       {c.invoices.length > 0 && (
         <Section title="Invoices">
           {c.invoices.map((i: any) => (
@@ -290,7 +361,7 @@ function Body({ d }: { d: any }) {
   );
 }
 
-const TITLE: Record<DetailKind, string> = { invoice: 'Invoice', dispute: 'Dispute', transaction: 'Transaction', customer: 'Customer' };
+const TITLE: Record<DetailKind, string> = { invoice: 'Invoice', dispute: 'Dispute', transaction: 'Transaction', customer: 'Customer', subscription: 'Subscription' };
 
 export default function DetailDrawer() {
   const [stack, setStack] = useState<{ kind: DetailKind; id: string }[]>([]);

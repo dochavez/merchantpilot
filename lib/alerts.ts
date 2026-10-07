@@ -64,6 +64,29 @@ export function alertFromWebhook(event: any): Omit<Alert, 'id' | 'at'> | null {
       };
     case 'PAYMENT.CAPTURE.COMPLETED':
       return { type, severity: 'low', title: `New sale ${amt(r.amount)}`, source: 'paypal-webhook' };
+    case 'BILLING.SUBSCRIPTION.ACTIVATED':
+      return { type, severity: 'low', title: `New subscriber ${safeId(r.id)}`, detail: safeId(r.plan_id), source: 'paypal-webhook' };
+    case 'BILLING.SUBSCRIPTION.CANCELLED':
+      return {
+        type,
+        severity: 'medium',
+        title: `Subscription cancelled ${safeId(r.id)}`,
+        detail: safeId(r.plan_id),
+        prompt: `Subscription ${safeId(r.id)} was just cancelled. Check whether cancellations of its plan are rising and suggest a win-back offer.`,
+        source: 'paypal-webhook',
+      };
+    case 'BILLING.SUBSCRIPTION.SUSPENDED':
+    case 'BILLING.SUBSCRIPTION.PAYMENT.FAILED':
+      return {
+        type,
+        severity: 'high',
+        title: `${event.event_type.endsWith('FAILED') ? 'Subscription payment failed' : 'Subscription suspended'} ${safeId(r.id)}`,
+        detail: amt(r.billing_info?.last_failed_payment?.amount ?? r.billing_info?.outstanding_balance),
+        prompt: `Subscription ${safeId(r.id)} has a failed or suspended payment. How much recurring revenue is at risk and what should I do to recover it?`,
+        source: 'paypal-webhook',
+      };
+    case 'PAYMENT.SALE.COMPLETED':
+      return { type, severity: 'low', title: `Subscription payment ${amt(r.amount ? { value: r.amount.total, currency_code: r.amount.currency } : undefined)}`, detail: safeId(r.billing_agreement_id), source: 'paypal-webhook' };
     case 'INVOICING.INVOICE.PAID':
       return { type, severity: 'low', title: `Invoice ${safeId(r.invoice?.detail?.invoice_number ?? r.id)} paid`, source: 'paypal-webhook' };
     default:

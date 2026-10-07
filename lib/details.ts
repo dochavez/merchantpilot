@@ -2,11 +2,11 @@
  * Drill-down details for anything clickable in the dashboard: invoice, dispute, transaction,
  * customer. Each returns the record, its related records and the audit trail entries about it.
  */
-import { disputeContext } from './analytics';
+import { disputeContext, monthlyValueOf } from './analytics';
 import type { Dataset, ProposedAction } from './types';
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
-export type DetailKind = 'invoice' | 'dispute' | 'transaction' | 'customer';
+export type DetailKind = 'invoice' | 'dispute' | 'transaction' | 'customer' | 'subscription';
 
 function customerSummary(ds: Dataset, key: string) {
   const k = key.toLowerCase();
@@ -18,6 +18,7 @@ function customerSummary(ds: Dataset, key: string) {
   const pays = tx.filter((t) => t.type === 'Payment');
   const refunds = tx.filter((t) => t.type === 'Refund');
   const disputes = ds.disputes.filter((d) => email && d.customerEmail === email);
+  const subscriptions = (ds.subscriptions ?? []).filter((x) => (email && x.subscriberEmail.toLowerCase() === email.toLowerCase()) || x.subscriberName.toLowerCase() === k);
   const spend = r2(pays.reduce((s, t) => s + t.gross, 0));
   const refunded = r2(-refunds.reduce((s, t) => s + t.gross, 0));
   // Spend percentile among all customers, for a simple segment.
@@ -31,10 +32,11 @@ function customerSummary(ds: Dataset, key: string) {
   if (spend > 0 && refunded / spend > 0.2) flags.push(`High refund ratio (${Math.round((refunded / spend) * 100)}% of spend)`);
   if (disputes.length) flags.push(`${disputes.length} dispute(s)`);
   if (invoices.some((i) => i.daysOverdue > 0)) flags.push('Has overdue invoices');
+  if (subscriptions.some((x) => x.status === 'SUSPENDED')) flags.push('Subscription suspended (failed payment)');
   return {
     name,
     email,
-    segment: invoices.length && !pays.length ? 'Wholesale (invoiced)' : rank >= 0.9 ? 'VIP (top 10% spend)' : pays.length >= 3 ? 'Repeat customer' : pays.length ? 'Occasional' : 'Invoiced',
+    segment: subscriptions.some((x) => x.status === 'ACTIVE') ? 'Subscriber' : invoices.length && !pays.length ? 'Wholesale (invoiced)' : rank >= 0.9 ? 'VIP (top 10% spend)' : pays.length >= 3 ? 'Repeat customer' : pays.length ? 'Occasional' : 'Invoiced',
     orders: pays.length,
     lifetimeSpend: spend,
     refunds: refunds.length,
@@ -50,6 +52,7 @@ function customerSummary(ds: Dataset, key: string) {
     recent: [...tx].sort((a, b) => b.datetime.localeCompare(a.datetime)).slice(0, 8),
     disputes,
     invoices,
+    subscriptions,
   };
 }
 
@@ -95,6 +98,23 @@ export function getDetails(ds: Dataset, actions: ProposedAction[], kind: DetailK
         dispute: ds.disputes.find((d) => d.transactionId === tx.transactionId) ?? null,
         customer: tx.customerEmail ? customerSummary(ds, tx.customerEmail) : null,
         actions: about(actions, (a) => a.kind === 'refund' && a.data.captureId === tx.transactionId),
+      };
+    }
+    case 'subscription': {
+      const sub = (ds.subscriptions ?? []).find((x) => x.subscriptionId === key);
+      if (!sub) return null;
+      const payments = ds.transactions.filter((t) => t.subscriptionId === sub.subscriptionId).sort((a, b) => b.datetime.localeCompare(a.datetime));
+      const paid = r2(payments.filter((t) => t.type === 'Payment').reduce((a, t) => a + t.gross, 0));
+      const months = Math.max(0, (Date.parse(sub.cancelledDate ?? new Date().toISOString()) - Date.parse(sub.startDate)) / (30.4375 * 86_400_000));
+      return {
+        kind,
+        subscription: sub,
+        monthlyValue: monthlyValueOf(sub),
+        tenureMonths: Math.round(months * 10) / 10,
+        paidInPeriod: paid,
+        payments: payments.slice(0, 12),
+        customer: customerSummary(ds, sub.subscriberEmail || sub.subscriberName),
+        actions: about(actions, (a) => a.title.includes(sub.subscriptionId)),
       };
     }
     case 'customer': {

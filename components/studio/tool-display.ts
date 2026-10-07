@@ -58,6 +58,7 @@ export const TOOL_DISPLAY: Record<string, AgAiToolDisplay> = {
   propose_refund: proposal('Refund', 'Preparing refund proposal…'),
   propose_dispute_evidence: proposal('Dispute evidence', 'Building the evidence pack…'),
   propose_payment_plan: proposal('Payment plan', 'Preparing payment plan…'),
+  paypal_subscriptions: simple('Reading subscriptions…', 'Read subscriptions & MRR', (a) => a?.status ?? a?.plan),
   portfolio_overview: simple('Comparing your businesses…', 'Compared your businesses'),
   paypal_forecast: simple('Forecasting cash flow…', 'Forecasted cash flow', (a) => `${a?.days ?? 60} days`),
   propose_invoice_reminder: proposal('Reminder', 'Preparing invoice reminder…'),

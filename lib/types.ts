@@ -27,6 +27,8 @@ export interface TransactionRow {
   /** For refunds/chargebacks: the payment they reverse */
   relatedTransactionId?: string;
   invoiceId?: string;
+  /** For recurring payments: the PayPal subscription (I-...) this charge belongs to. */
+  subscriptionId?: string;
 }
 
 export type DisputeStatus =
@@ -82,6 +84,44 @@ export interface InvoiceRow {
   lastReminderAt?: string;
   /** Installment plan offered through PayPal partial payments. */
   paymentPlan?: { installments: number; minimumAmountDue: number; offeredAt: string };
+  /** Line items (products) on the invoice, when known. */
+  items?: InvoiceItem[];
+  /** Short text such as "Burr Grinder Pro ×2, Paper Filters x200 ×10" (grids, exports). */
+  itemsSummary?: string;
+}
+
+export interface InvoiceItem {
+  name: string;
+  quantity: number;
+  unitPrice: number;
+  total: number;
+}
+
+export type SubscriptionStatus = 'APPROVAL_PENDING' | 'APPROVED' | 'ACTIVE' | 'SUSPENDED' | 'CANCELLED' | 'EXPIRED';
+
+/** A PayPal subscription (Subscriptions API v1). */
+export interface SubscriptionRow {
+  subscriptionId: string;
+  planId: string;
+  planName: string;
+  status: SubscriptionStatus;
+  subscriberName: string;
+  subscriberEmail: string;
+  country?: string;
+  /** Price per billing cycle. */
+  amount: number;
+  currency: string;
+  interval: 'DAY' | 'WEEK' | 'MONTH' | 'YEAR';
+  intervalCount: number;
+  /** Normalised monthly value (MRR contribution) while ACTIVE. */
+  monthlyValue: number;
+  startDate: string;
+  nextBillingDate?: string;
+  lastPaymentDate?: string;
+  lastPaymentAmount?: number;
+  /** Consecutive failed payments (PayPal suspends after the plan's threshold). */
+  failedPayments: number;
+  cancelledDate?: string;
 }
 
 export interface Dataset {
@@ -92,6 +132,8 @@ export interface Dataset {
   transactions: TransactionRow[];
   disputes: DisputeRow[];
   invoices: InvoiceRow[];
+  /** PayPal subscriptions (recurring billing). Optional: older datasets have none. */
+  subscriptions?: SubscriptionRow[];
   /** Non-fatal problems while loading live data (e.g. Transaction Search not enabled). */
   warnings: string[];
 }

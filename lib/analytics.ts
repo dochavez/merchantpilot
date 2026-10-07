@@ -2,7 +2,7 @@
  * Deterministic analytics over the dataset. The LLM never does arithmetic on raw rows: tools call
  * these functions and the agent explains the numbers. This keeps answers correct and auditable.
  */
-import type { Dataset, DisputeRow, TransactionRow } from './types';
+import type { Dataset, DisputeRow, SubscriptionRow, TransactionRow } from './types';
 
 const DAY = 86_400_000;
 const r2 = (n: number) => Math.round(n * 100) / 100;
@@ -183,6 +183,8 @@ export function detectAnomalies(ds: Dataset, now = Date.now()): Finding[] {
     });
   }
 
+  findings.push(...subscriptionFindings(ds, now));
+
   const rank = { high: 0, medium: 1, low: 2 } as const;
   return findings.sort((a, b) => rank[a.severity] - rank[b.severity]);
 }
@@ -240,4 +242,94 @@ export function disputeContext(ds: Dataset, disputeId: string) {
       : null,
     recommendedEvidence: evidence,
   };
+}
+
+/* ------------------------------------------------------------------ subscriptions (recurring) */
+
+const MONTH_DAYS = 30.4375;
+const cycleDaysOf = (s: Pick<SubscriptionRow, 'interval' | 'intervalCount'>) =>
+  (s.interval === 'DAY' ? 1 : s.interval === 'WEEK' ? 7 : s.interval === 'MONTH' ? MONTH_DAYS : 365.25) * (s.intervalCount || 1);
+/** Monthly value of a subscription's price, whatever its billing cycle. */
+export const monthlyValueOf = (s: Pick<SubscriptionRow, 'amount' | 'interval' | 'intervalCount'>) => r2((s.amount * MONTH_DAYS) / cycleDaysOf(s));
+
+/**
+ * Recurring revenue KPIs: MRR/ARR, active subscribers, new and churned in the period, churn rate,
+ * suspended subscriptions (failed payments → MRR at risk), renewals due soon, and a per-plan table.
+ */
+export function subscriptionMetrics(ds: Dataset, days = 30, now = Date.now()) {
+  const subs = ds.subscriptions ?? [];
+  const since = (d?: string, off = 0) => !!d && Date.parse(d) > now - (days + off) * DAY && Date.parse(d) <= now - off * DAY;
+  const active = subs.filter((s) => s.status === 'ACTIVE');
+  const suspended = subs.filter((s) => s.status === 'SUSPENDED');
+  const mrr = r2(active.reduce((a, s) => a + monthlyValueOf(s), 0));
+  const churned = subs.filter((s) => s.status === 'CANCELLED' && since(s.cancelledDate));
+  const churnedPrev = subs.filter((s) => s.status === 'CANCELLED' && since(s.cancelledDate, days));
+  const created = subs.filter((s) => since(s.startDate));
+  // Subscribers at the start of the period = active now + churned in period - new in period (approx.).
+  const startBase = Math.max(1, active.length + suspended.length + churned.length - created.length);
+  const prevBase = Math.max(1, startBase + churnedPrev.length - subs.filter((s) => since(s.startDate, days)).length);
+  const soon = active.filter((s) => s.nextBillingDate && Date.parse(s.nextBillingDate) - now <= 7 * DAY && Date.parse(s.nextBillingDate) >= now - DAY);
+  const plans = [...new Set(subs.map((s) => s.planName))].map((planName) => {
+    const ps = subs.filter((s) => s.planName === planName);
+    const act = ps.filter((s) => s.status === 'ACTIVE');
+    return {
+      planName,
+      price: ps[0]?.amount ?? 0,
+      billing: ps[0] ? `every ${ps[0].intervalCount > 1 ? ps[0].intervalCount + ' ' : ''}${ps[0].interval.toLowerCase()}${ps[0].intervalCount > 1 ? 's' : ''}` : '',
+      active: act.length,
+      mrr: r2(act.reduce((a, s) => a + monthlyValueOf(s), 0)),
+      newInPeriod: ps.filter((s) => since(s.startDate)).length,
+      churnedInPeriod: ps.filter((s) => s.status === 'CANCELLED' && since(s.cancelledDate)).length,
+      churnedPrevPeriod: ps.filter((s) => s.status === 'CANCELLED' && since(s.cancelledDate, days)).length,
+      suspended: ps.filter((s) => s.status === 'SUSPENDED').length,
+    };
+  });
+  const recurringRevenue = r2(ds.transactions.filter((t) => t.type === 'Payment' && t.subscriptionId && inLastDays(t, days, now)).reduce((a, t) => a + t.gross, 0));
+  return {
+    periodDays: days,
+    hasSubscriptions: subs.length > 0,
+    currency: subs[0]?.currency ?? ds.currency,
+    activeSubscribers: active.length,
+    mrr,
+    arr: r2(mrr * 12),
+    averageRevenuePerSubscriber: active.length ? r2(mrr / active.length) : 0,
+    newSubscribers: created.length,
+    churnedSubscribers: churned.length,
+    churnedPrevPeriod: churnedPrev.length,
+    churnRatePct: pct(churned.length / startBase),
+    churnRatePrevPct: pct(churnedPrev.length / prevBase),
+    suspendedSubscribers: suspended.length,
+    mrrAtRisk: r2(suspended.reduce((a, s) => a + monthlyValueOf(s), 0)),
+    renewalsNext7Days: { count: soon.length, amount: r2(soon.reduce((a, s) => a + s.amount, 0)) },
+    recurringRevenueInPeriod: recurringRevenue,
+    plans: plans.sort((a, b) => b.mrr - a.mrr),
+  };
+}
+
+function subscriptionFindings(ds: Dataset, now: number): Finding[] {
+  if (!ds.subscriptions?.length) return [];
+  const m = subscriptionMetrics(ds, 30, now);
+  const out: Finding[] = [];
+  if (m.suspendedSubscribers > 0) {
+    out.push({
+      id: 'subscriptions-suspended',
+      severity: m.mrrAtRisk >= 150 ? 'high' : 'medium',
+      title: `${m.suspendedSubscribers} subscriptions suspended after failed payments (${m.mrrAtRisk} ${m.currency}/month at risk)`,
+      detail: `PayPal suspended ${m.suspendedSubscribers} subscriptions because renewal payments failed. Each one stops paying until the subscriber updates the payment method or the subscription is reactivated.`,
+      evidence: { suspended: m.suspendedSubscribers, mrrAtRisk: m.mrrAtRisk, subscriptions: (ds.subscriptions ?? []).filter((s) => s.status === 'SUSPENDED').slice(0, 10).map((s) => ({ id: s.subscriptionId, plan: s.planName, subscriber: s.subscriberEmail, failedPayments: s.failedPayments })) },
+      suggestedActions: ['Email the subscribers a link to update their payment method', 'Reactivate after they confirm', 'Offer one month free to recover high-value plans'],
+    });
+  }
+  const worst = m.plans.filter((p) => p.churnedInPeriod >= 3 && p.churnedInPeriod >= 2 * Math.max(1, p.churnedPrevPeriod)).sort((a, b) => b.churnedInPeriod - a.churnedInPeriod)[0];
+  if (worst) {
+    out.push({
+      id: 'subscription-churn-spike',
+      severity: worst.churnedInPeriod >= 8 ? 'high' : 'medium',
+      title: `Cancellations of "${worst.planName}" jumped: ${worst.churnedInPeriod} in 30 days vs ${worst.churnedPrevPeriod} before`,
+      detail: `Overall churn ${m.churnRatePct}% (previous 30 days ${m.churnRatePrevPct}%). MRR is ${m.mrr} ${m.currency} from ${m.activeSubscribers} active subscribers.`,
+      evidence: { plan: worst, churnRatePct: m.churnRatePct, churnRatePrevPct: m.churnRatePrevPct },
+      suggestedActions: ['Survey the subscribers who cancelled', 'Offer a pause option or a cheaper cadence', 'Send a win-back offer to recent cancellations'],
+    });
+  }
+  return out;
 }

@@ -129,6 +129,18 @@ function buildPayPalTools(api: AgStudioApi): AgAiTool[] {
         }),
     ),
     define(
+      'paypal_subscriptions',
+      'Recurring revenue (PayPal Subscriptions): MRR, ARR, active subscribers, new vs cancelled, churn rate vs previous period, SUSPENDED subscriptions after failed payments (MRR at risk), renewals due in 7 days and a per-plan table. Filter by status (ACTIVE, SUSPENDED, CANCELLED), plan name or subscriptionId.',
+      (s) =>
+        s.object({
+          status: s.string({ description: 'ACTIVE | SUSPENDED | CANCELLED | EXPIRED' }).optional(),
+          plan: s.string({ description: 'Part of the plan name' }).optional(),
+          subscriptionId: s.string({ description: 'I-… id of one subscription' }).optional(),
+          periodDays: s.number({ description: '7-90, default 30' }).optional(),
+          limit: s.number().optional(),
+        }),
+    ),
+    define(
       'portfolio_overview',
       'Compare ALL the owner\'s businesses: health score with reasons, sales, refund rate, money at stake, forecast upside, top issues, consolidated totals and insights. Use when the owner asks about "my businesses", which one needs attention, or totals across them.',
       (s) => s.object({}),
@@ -201,6 +213,7 @@ How you work:
 4. Money-moving actions are NEVER executed by you. Use propose_refund, propose_invoice_reminder, propose_accept_dispute or draft_dispute_response. They only queue a proposal. Each proposal appears as a card with Approve/Reject buttons right under your message (and in the Action Center). The merchant's approval rules (⚖ Rules in the Action Center) may auto-execute small actions or require two approvers: read the status and note in each tool result and report exactly that ("done automatically under your rules", "needs a second approver", or "approve or reject it on the card"). Never claim something executed unless the result says executed. Do not repeat the card's details at length.
 5. Before proposing a refund, look up the payment with paypal_find_transactions to get the exact transactionId. Prefer few, high-value, well-justified proposals (max 5 at once) and give each a data-backed rationale.
 6. For disputes: accept only when evidence favours the buyer (e.g. confirmed damaged batch); otherwise call paypal_get_dispute and then propose_dispute_evidence with a factual seller statement and the evidence list (this submits a PDF evidence pack after approval). Mention deadlines. For large or very late invoices, prefer propose_payment_plan (installments) over a plain reminder.
+7c. Subscriptions / recurring revenue: for MRR, subscribers, churn, cancellations, failed renewals or plans, call paypal_subscriptions and quote mrr, activeSubscribers, churnRatePct and mrrAtRisk. The data source "subscriptions" has fields mrr, activeSubscribers, churned and mrrAtRisk for charts (e.g. MRR by plan, cancellations by subscriptions.cancelledDate::week); transactions.saleType splits Subscription / Invoice / One-off sales.
 7a. Several businesses: the owner may run more than one business. For questions across businesses (which one is doing worst, totals, comparisons) call portfolio_overview and quote its numbers; mention the Portfolio page for the full comparison.
 7. Forecasts / what-if: for questions about future cash, "what happens if…" or "how much is fixing X worth", call paypal_forecast (once without a scenario and once with the relevant scenario flags if useful), quote baseline, scenario and upside, and mention the "Cash-flow forecast" widget on the dashboard where they can toggle the same scenarios.
 7b. Reports: when the merchant wants a report, a file, Excel, PDF, CSV or Power BI, call create_report (pdf by default; use language 'es' if they write in Spanish). A download card appears under your message.

@@ -47,7 +47,7 @@ const THEME = (studioTheme as any).withParams({
 });
 
 /** Register the custom widget and give it its own group in Studio's widget menu. */
-const DRILL_CELLS = { invoice: makeDrillCell('invoice'), dispute: makeDrillCell('dispute'), transaction: makeDrillCell('transaction'), customer: makeDrillCell('customer') } as const;
+const DRILL_CELLS = { invoice: makeDrillCell('invoice'), dispute: makeDrillCell('dispute'), transaction: makeDrillCell('transaction'), customer: makeDrillCell('customer'), subscription: makeDrillCell('subscription') } as const;
 /** Grid columns whose field carries `context.drill` become clickable and open the detail drawer. */
 const createCellRenderer = (field: any) => DRILL_CELLS[field?.context?.drill as keyof typeof DRILL_CELLS];
 

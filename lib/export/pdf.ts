@@ -3,6 +3,7 @@
  * Page 1: summary + KPIs + money at stake. Page 2: trends. Page 3: priorities, disputes, invoices.
  * Last: audit trail of AI proposals and human decisions.
  */
+import { subscriptionMetrics } from '../analytics';
 import PDFDocument from 'pdfkit';
 import type { ReportModel } from './report-model';
 
@@ -225,6 +226,34 @@ export async function buildPdf(m: ReportModel, summary: { text: string; byAi: bo
     [90, 190, 90, 70, CW - 440],
     { alignRight: [2, 3], highlight: (i) => (overdue[i].daysOverdue > 30 ? C.redSoft : undefined) },
   );
+
+  /* -------------------------------------------------------------- recurring revenue */
+  const sm = subscriptionMetrics(m.dataset, m.periodDays);
+  if (sm.hasSubscriptions) {
+    ensure(120);
+    doc.y += 8;
+    sectionTitle('Recurring revenue (PayPal Subscriptions)');
+    doc
+      .font('Helvetica')
+      .fontSize(9.5)
+      .fillColor(C.ink)
+      .text(
+        t(
+          `MRR ${money(sm.mrr)} (ARR ${money(sm.arr)}) from ${sm.activeSubscribers} active subscribers · ${sm.newSubscribers} new and ${sm.churnedSubscribers} cancelled in ${m.periodDays} days (churn ${sm.churnRatePct}%, previous ${sm.churnRatePrevPct}%) · ${sm.suspendedSubscribers} suspended after failed payments = ${money(sm.mrrAtRisk)}/month at risk.`,
+        ),
+        M,
+        doc.y,
+        { width: CW, lineGap: 2 },
+      );
+    doc.y += 6;
+    table(
+      doc,
+      ['Plan', 'Active', 'MRR', 'New', 'Cancelled', 'Suspended'],
+      sm.plans.map((p) => [p.planName, String(p.active), money(p.mrr), String(p.newInPeriod), String(p.churnedInPeriod), String(p.suspended)]),
+      [190, 60, 90, 50, 70, CW - 460],
+      { alignRight: [1, 2, 3, 4, 5], highlight: (i) => (sm.plans[i].churnedInPeriod >= 2 * Math.max(1, sm.plans[i].churnedPrevPeriod) && sm.plans[i].churnedInPeriod >= 3 ? C.amberSoft : undefined) },
+    );
+  }
 
   /* -------------------------------------------------------------- audit trail */
   ensure(100);

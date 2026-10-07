@@ -4,7 +4,7 @@
  * cross-business insights. Deterministic – the AI only explains it.
  */
 import { listActions } from './actions';
-import { detectAnomalies, overview } from './analytics';
+import { detectAnomalies, overview, subscriptionMetrics } from './analytics';
 import { runInBusiness, type Business } from './business-context';
 import { listBusinesses } from './businesses';
 import { dataMode } from './config';
@@ -34,6 +34,8 @@ export interface BusinessSnapshot {
   topFindings?: { title: string; severity: string }[];
   weekly?: { weekStart: string; sales: number }[];
   pendingApprovals?: number;
+  /** Recurring revenue (PayPal Subscriptions), when the business has any. */
+  recurring?: { mrr: number; activeSubscribers: number; churnRatePct: number; mrrAtRisk: number };
   error?: string;
 }
 
@@ -100,6 +102,12 @@ export async function snapshot(b: Business): Promise<BusinessSnapshot> {
         topFindings: findings.slice(0, 3).map((f) => ({ title: f.title, severity: f.severity })),
         weekly: [...weeks.entries()].sort(([a], [c]) => a.localeCompare(c)).map(([weekStart, sales]) => ({ weekStart, sales: r2(sales) })),
         pendingApprovals: (await listActions()).filter((a) => a.status === 'pending').length,
+        ...(ds.subscriptions?.length
+          ? (() => {
+              const sm = subscriptionMetrics(ds, 30, now);
+              return { recurring: { mrr: sm.mrr, activeSubscribers: sm.activeSubscribers, churnRatePct: sm.churnRatePct, mrrAtRisk: sm.mrrAtRisk } };
+            })()
+          : {}),
       };
     } catch (e) {
       return { ...base, error: (e as Error).message.slice(0, 200) };
@@ -129,6 +137,13 @@ export function portfolioInsights(list: BusinessSnapshot[]): string[] {
     const top = [...ok].sort((a, b) => b.kpis!.grossSales - a.kpis!.grossSales)[0];
     const share = Math.round((top.kpis!.grossSales / total) * 100);
     out.push(`${top.name} brings ${share}% of your revenue${share >= 60 ? ' – high concentration risk if it slows down' : ''}.`);
+  }
+  const rec = ok.filter((b) => b.recurring);
+  if (rec.length) {
+    const mrr = rec.reduce((s, b) => s + b.recurring!.mrr, 0);
+    const risk = rec.reduce((s, b) => s + b.recurring!.mrrAtRisk, 0);
+    const churny = [...rec].sort((a, b) => b.recurring!.churnRatePct - a.recurring!.churnRatePct)[0];
+    out.push(`Recurring revenue: ${fmt(mrr)}/month across ${rec.length} business(es)${risk > 0 ? `, ${fmt(risk)}/month at risk from failed renewals` : ''}; highest churn at ${churny.name} (${churny.recurring!.churnRatePct}% in 30 days).`);
   }
   const upside = ok.reduce((s, b) => s + (b.forecast30?.upside ?? 0), 0);
   if (upside > 0) out.push(`Acting on the open issues across all businesses is worth about ${fmt(upside)} in the next 30 days.`);

@@ -12,10 +12,11 @@
  * Dates are anchored to `today` so the demo always looks current.
  */
 import type { DisputeRow, InvoiceRow, TransactionRow, Dataset } from '../types';
+import { addInvoiceItems, addSubscriptions } from './recurring';
 
 /* ------------------------------------------------------------------------------ tiny utilities */
 
-function mulberry32(seed: number) {
+export function mulberry32(seed: number) {
   let a = seed >>> 0;
   return () => {
     a = (a + 0x6d2b79f5) >>> 0;
@@ -438,6 +439,11 @@ export function generateDemoDataset(opts: GenerateOptions = {}): Dataset {
     }
   }
 
+  // Recurring revenue + invoice line items use their own random streams, so the one-off sales story
+  // above stays identical.
+  const subscriptions = addSubscriptions(opts.profile ?? 'supply', P.seed + 7, today, days, transactions);
+  addInvoiceItems(invoices, P.products, P.seed + 11);
+
   transactions.sort((a, b) => a.datetime.localeCompare(b.datetime));
   disputes.sort((a, b) => b.createdDate.localeCompare(a.createdDate));
   invoices.sort((a, b) => b.invoiceDate.localeCompare(a.invoiceDate));
@@ -450,6 +456,7 @@ export function generateDemoDataset(opts: GenerateOptions = {}): Dataset {
     transactions,
     disputes,
     invoices,
+    subscriptions,
     warnings: [],
   };
 }

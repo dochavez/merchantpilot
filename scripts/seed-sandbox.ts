@@ -2,7 +2,8 @@
  * npm run seed:sandbox
  * Fills YOUR PayPal sandbox business account with realistic activity so live mode has a story:
  *   - captured card payments for coffee products (some get refunded)
- *   - wholesale invoices: some sent and unpaid with past due dates (overdue)
+ *   - wholesale invoices with product line items: some overdue, some not yet due, some paid
+ *   Subscriptions need a buyer approval each: see `npm run sandbox:subscription`.
  *
  * Disputes cannot be created by the seller via API; see docs/SETUP.es.md ("Crear disputas").
  * Safe to run more than once. Uses only sandbox endpoints.
@@ -143,7 +144,25 @@ function isoDate(daysFromToday: number) {
   return new Date(Date.now() + daysFromToday * 86_400_000).toISOString().slice(0, 10);
 }
 
-async function invoice(recipient: { name: string; email: string }, amount: number, invoiceDaysAgo: number, termDays: number, item = 'Wholesale beans & supplies') {
+type Line = { name: string; qty: number; price: number };
+
+/** 1-3 catalogue products with wholesale quantities that add up to roughly `target` USD. */
+function invoiceLines(target: number): Line[] {
+  const n = 1 + Math.floor(rnd() * 3);
+  const pool = [...PRODUCTS].sort(() => rnd() - 0.5).slice(0, n);
+  let remaining = target;
+  return pool.map((p, i) => {
+    const share = i === pool.length - 1 ? remaining : remaining * (0.35 + rnd() * 0.3);
+    const qty = Math.max(1, Math.round(share / p.price));
+    remaining = Math.max(p.price, remaining - qty * p.price);
+    return { name: p.name, qty, price: p.price };
+  });
+}
+
+async function invoice(recipient: { name: string; email: string }, targetAmount: number, invoiceDaysAgo: number, termDays: number) {
+  const lines = invoiceLines(targetAmount);
+  const total = lines.reduce((s, l) => s + l.qty * l.price, 0);
+  const reference = lines.map((l) => `${l.name} ×${l.qty}`).join(', ').slice(0, 120);
   const inv = await paypalPost(
     '/v2/invoicing/invoices',
     {
@@ -151,17 +170,18 @@ async function invoice(recipient: { name: string; email: string }, amount: numbe
         currency_code: 'USD',
         invoice_date: isoDate(-invoiceDaysAgo),
         payment_term: { due_date: isoDate(-invoiceDaysAgo + termDays) },
+        reference,
         note: 'Wholesale coffee order – thank you!',
       },
       invoicer: { business_name: 'Altura Coffee Supply' },
       primary_recipients: [{ billing_info: { business_name: recipient.name, email_address: recipient.email } }],
-      items: [{ name: item, quantity: '1', unit_amount: { currency_code: 'USD', value: amount.toFixed(2) } }],
+      items: lines.map((l) => ({ name: l.name, quantity: String(l.qty), unit_amount: { currency_code: 'USD', value: l.price.toFixed(2) }, unit_of_measure: 'QUANTITY' })),
     },
     { Prefer: 'return=representation' },
   );
   const id = inv.id ?? String(inv.href ?? '').split('/').pop();
   await paypalPost(`/v2/invoicing/invoices/${id}/send`, { send_to_recipient: true, send_to_invoicer: false });
-  return id as string;
+  return { id: id as string, total };
 }
 
 /** Records an off-PayPal payment so the invoice shows as paid (MARKED_AS_PAID). */
@@ -233,7 +253,6 @@ async function main() {
     { name: 'Mercado Verde', email: 'sb-mercado-verde@example.com' },
     { name: 'Summit Hotel Group', email: 'sb-summit-hotels@example.com' },
   ];
-  const ITEMS = ['Wholesale beans & supplies', 'Monthly coffee subscription (office)', 'Espresso machine maintenance', 'Barista training workshop', 'Single-origin beans – 20 kg', 'Café equipment lease'];
   // Mix: ~45% overdue (a few very late), ~30% not due yet, ~25% already paid.
   // The first three keep the original story: 34, 12 and 6 days overdue.
   const FIXED = [
@@ -256,10 +275,10 @@ async function main() {
       amount = Math.round((180 + rnd() * 3000) / 5) * 5;
     }
     try {
-      const id = await invoice(c, amount, daysAgo, 30, pick(ITEMS));
+      const { id, total } = await invoice(c, amount, daysAgo, 30);
       invoices++;
       if (kind === 'paid') {
-        await markPaid(id, amount, Math.max(0, daysAgo - 25 - Math.floor(rnd() * 10)));
+        await markPaid(id, total, Math.max(0, daysAgo - 25 - Math.floor(rnd() * 10)));
         paid++;
       }
       process.stdout.write(kind === 'paid' ? '$' : 'i');

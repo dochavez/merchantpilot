@@ -9,10 +9,11 @@ import { dataMode } from './config';
 import { getDataset, invalidateDataset, markInvoiceReminded } from './data';
 import { demoAcceptDispute, demoInvoiceReminder, demoPaymentPlan, demoRefund, demoSubmitEvidence } from './demo/store';
 import { enablePaymentPlanLive, submitDisputeEvidenceLive } from './paypal/actions-live';
+import { paypalGet } from './paypal/rest';
 import { runToolkitTool } from './paypal/toolkit';
 import { cleanApprover, evaluatePolicy, getPolicy } from './policies';
 import { getStore } from './store';
-import type { ActionPayload, ProposedAction } from './types';
+import type { ActionPayload, ProposedAction, TransactionRow } from './types';
 
 export async function listActions(): Promise<ProposedAction[]> {
   return getStore().listActions();
@@ -24,6 +25,38 @@ export async function clearActions() {
 
 export class ActionValidationError extends Error {}
 
+/** Builds a minimal payment row from GET /v2/payments/captures/{id} (live mode only). */
+async function liveCaptureAsPayment(captureId: string): Promise<TransactionRow | undefined> {
+  if (!/^[A-Z0-9]{8,30}$/i.test(captureId)) return undefined;
+  try {
+    const c = await paypalGet(`/v2/payments/captures/${captureId}`);
+    if (c.status === 'REFUNDED') throw new ActionValidationError(`Capture ${captureId} is already fully refunded`);
+    const gross = Number(c.amount?.value ?? 0);
+    const fee = -Number(c.seller_receivable_breakdown?.paypal_fee?.value ?? 0);
+    const at = String(c.create_time ?? new Date().toISOString());
+    return {
+      transactionId: captureId,
+      date: at.slice(0, 10),
+      datetime: at,
+      eventCode: 'T0006',
+      type: 'Payment',
+      status: 'Completed',
+      gross,
+      fee,
+      net: Math.round((gross + fee) * 100) / 100,
+      country: '',
+      instrument: 'PayPal',
+      currency: String(c.amount?.currency_code ?? 'USD'),
+      customerName: 'PayPal buyer',
+      customerEmail: '',
+      item: c.status === 'PARTIALLY_REFUNDED' ? 'recent payment (partially refunded)' : 'recent payment',
+    };
+  } catch (e) {
+    if (e instanceof ActionValidationError) throw e;
+    return undefined;
+  }
+}
+
 export async function proposeAction(input: ActionPayload & { rationale: string }): Promise<ProposedAction> {
   const ds = await getDataset();
   let title = '';
@@ -31,7 +64,9 @@ export async function proposeAction(input: ActionPayload & { rationale: string }
 
   switch (input.kind) {
     case 'refund': {
-      const tx = ds.transactions.find((t) => t.transactionId === input.data.captureId);
+      let tx = ds.transactions.find((t) => t.transactionId === input.data.captureId);
+      // Fresh live payments can take hours to reach Transaction Search: read the capture directly.
+      if (!tx && dataMode() === 'live') tx = await liveCaptureAsPayment(input.data.captureId);
       if (!tx || tx.type !== 'Payment') throw new ActionValidationError(`No payment with capture/transaction id ${input.data.captureId}`);
       const refunded = ds.transactions
         .filter((t) => t.type === 'Refund' && t.relatedTransactionId === tx.transactionId)

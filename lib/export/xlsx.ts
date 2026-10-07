@@ -4,6 +4,7 @@
  */
 import ExcelJS from 'exceljs';
 import type { ReportModel } from './report-model';
+import { subscriptionMetrics } from '../analytics';
 
 const BRAND = 'FF0070E0';
 const INK = 'FF0F172A';
@@ -115,6 +116,28 @@ export async function buildWorkbook(m: ReportModel, mode: WorkbookMode = 'simple
     row.getCell(4).numFmt = '+0.0%;-0.0%;0.0%';
     row.getCell(1).border = { bottom: { style: 'hair', color: { argb: 'FFE2E8F0' } } };
   });
+  const sm = subscriptionMetrics(m.dataset, m.periodDays);
+  if (sm.hasSubscriptions) {
+    const extra: [string, number, number | null, 'money' | 'int' | 'pct'][] = [
+      ['Recurring revenue (MRR)', sm.mrr, null, 'money'],
+      ['Active subscribers', sm.activeSubscribers, null, 'int'],
+      ['Subscription churn (%)', sm.churnRatePct, sm.churnRatePrevPct, 'pct'],
+      ['MRR at risk (failed renewals)', sm.mrrAtRisk, null, 'money'],
+    ];
+    extra.forEach(([label, v, prev, fmt]) => {
+      const i = kpiRows.length;
+      kpiRows.push([label, v, prev, fmt]);
+      const row = s.getRow(5 + i);
+      row.getCell(1).value = label;
+      row.getCell(2).value = v;
+      row.getCell(3).value = prev;
+      if (prev !== null) row.getCell(4).value = { formula: `IF(C${5 + i}=0,"",B${5 + i}/C${5 + i}-1)` };
+      const nf = fmt === 'money' ? moneyFmt(cur) : fmt === 'pct' ? '0.0"%"' : '#,##0';
+      row.getCell(2).numFmt = nf;
+      row.getCell(3).numFmt = nf;
+      row.getCell(4).numFmt = '+0.0%;-0.0%;0.0%';
+    });
+  }
   const stakeRow = 5 + kpiRows.length + 1;
   s.getCell(`A${stakeRow}`).value = 'Money you can still act on';
   s.getCell(`A${stakeRow}`).font = { bold: true, size: 12 };
@@ -272,11 +295,34 @@ export async function buildWorkbook(m: ReportModel, mode: WorkbookMode = 'simple
       { header: 'Due date', key: 'dueDate', width: 12 },
       { header: 'Days overdue', key: 'daysOverdue', fmt: 'int', width: 13 },
       { header: 'Last reminder', key: 'lastReminderAt', width: 20 },
+      { header: 'Products', key: 'itemsSummary', width: 60 },
     ],
     m.dataset.invoices as any,
     cur,
     { highlight: (r) => (Number(r.daysOverdue) > 30 ? RED : Number(r.daysOverdue) > 0 ? AMBER : undefined) },
   );
+  if (full && sm.hasSubscriptions)
+    addTableSheet(
+      wb,
+      'Subscriptions',
+      [
+        { header: 'Subscription ID', key: 'subscriptionId', width: 18 },
+        { header: 'Plan', key: 'planName', width: 30 },
+        { header: 'Status', key: 'status', width: 12 },
+        { header: 'Subscriber', key: 'subscriberName', width: 22 },
+        { header: 'Email', key: 'subscriberEmail', width: 30 },
+        { header: 'Price', key: 'amount', fmt: 'money', width: 11 },
+        { header: 'Every', key: 'every', width: 10 },
+        { header: 'MRR', key: 'monthlyValue', fmt: 'money', width: 11 },
+        { header: 'Started', key: 'startDate', width: 12 },
+        { header: 'Next billing', key: 'nextBillingDate', width: 12 },
+        { header: 'Cancelled', key: 'cancelledDate', width: 12 },
+        { header: 'Failed payments', key: 'failedPayments', fmt: 'int', width: 15 },
+      ],
+      (m.dataset.subscriptions ?? []).map((x) => ({ ...x, every: `${x.intervalCount > 1 ? x.intervalCount + ' ' : ''}${x.interval.toLowerCase()}` })) as any,
+      cur,
+      { highlight: (r) => (r.status === 'SUSPENDED' ? RED : r.status === 'CANCELLED' ? AMBER : undefined), dataBar: ['monthlyValue'] },
+    );
   if (full) addTableSheet(
     wb,
     'Audit trail',

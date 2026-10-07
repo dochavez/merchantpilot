@@ -4,13 +4,14 @@
  *
  * Configure in the PayPal Developer Dashboard -> your app -> Webhooks:
  *   URL: https://<your-app>.onrender.com/api/webhooks/paypal
- *   Events: PAYMENT.CAPTURE.*, CUSTOMER.DISPUTE.*, INVOICING.INVOICE.*
+ *   Events: PAYMENT.CAPTURE.*, CUSTOMER.DISPUTE.*, INVOICING.INVOICE.*, BILLING.SUBSCRIPTION.*, PAYMENT.SALE.COMPLETED
  * Then set PAYPAL_WEBHOOK_ID.
  */
 import { config, hasPayPalCredentials } from '@/lib/config';
 import { invalidateDataset } from '@/lib/data';
 import { paypalPost } from '@/lib/paypal/rest';
 import { addAlert, alertFromWebhook } from '@/lib/alerts';
+import { trackSubscriptionId } from '@/lib/paypal/live-data';
 
 const KEY = Symbol.for('merchantpilot.webhookEvents');
 type G = typeof globalThis & { [KEY]?: { id: string; type: string; at: string; verified: boolean }[] };
@@ -54,6 +55,9 @@ export async function POST(req: Request) {
   invalidateDataset();
   // Only signature-verified events become alerts (unverified ones just refresh the data cache).
   if (verified) {
+    // Remember subscription ids: PayPal has no endpoint that lists all subscriptions.
+    const subId = String(event?.event_type ?? '').startsWith('BILLING.SUBSCRIPTION.') ? event?.resource?.id : event?.resource?.billing_agreement_id;
+    if (typeof subId === 'string') await trackSubscriptionId(subId).catch(() => undefined);
     const alert = alertFromWebhook(event);
     if (alert) await addAlert(alert).catch(() => undefined);
   }

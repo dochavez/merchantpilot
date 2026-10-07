@@ -25,8 +25,9 @@ Small merchants live inside PayPal but can't see *why* their money moves. Refund
 7. **Morning brief** – a daily summary (email via Resend, or WhatsApp) with **signed one-tap approve links** that go through the same rules and audit trail.
 8. **Everywhere** – MerchantPilot is also an **MCP server** (`/api/mcp`): ask about your PayPal business and queue actions from Claude Desktop, Cursor or any MCP client; proposals come back with signed approve links. **Voice** in Spanish/English, **real-time alerts** from PayPal webhooks (new dispute → toast → "Ask AI"), and **QuickBooks / Xero** exports for the accountant.
 9. **Many businesses, one owner** – switch between stores or completely different businesses (each with its own PayPal app; secrets stored AES-256-GCM encrypted). The **Portfolio** page scores every business 0-100 (grade A-D, with the reason behind every point lost), consolidates sales / net / money at stake, writes an owner briefing (EN/ES), compares them in an AG Grid + AG Charts view and exports a consolidated PDF. The agent and MCP get a `portfolio_overview` tool (*"which business needs me first?"*).
-10. **Drill down** – click any invoice number, customer, dispute or transaction in the dashboard grids to open a detail drawer: invoice timeline, customer segment / lifetime value / refunds, dispute context and evidence pack, related transactions, with one-click AI actions.
-11. **Share** – one click (or one sentence in the chat: *"send me this month's report"*) produces an **executive PDF** with an AI-written summary, an **Excel workbook** with every table ready for pivots, CSVs, or a **live OData feed for Power BI and Excel** that refreshes from PayPal.
+10. **Recurring revenue** – PayPal Subscriptions support: MRR/ARR, active subscribers, churn vs previous period, subscriptions suspended after failed renewals (MRR at risk), renewals due, per-plan breakdown; alerts from `BILLING.SUBSCRIPTION.*` webhooks; a `paypal_subscriptions` tool for the agent and MCP. Invoices carry product line items.
+11. **Drill down** – click any invoice number, customer, dispute or transaction in the dashboard grids to open a detail drawer: invoice timeline, customer segment / lifetime value / refunds, dispute context and evidence pack, related transactions, with one-click AI actions.
+12. **Share** – one click (or one sentence in the chat: *"send me this month's report"*) produces an **executive PDF** with an AI-written summary, an **Excel workbook** with every table ready for pivots, CSVs, or a **live OData feed for Power BI and Excel** that refreshes from PayPal.
 
 ## Architecture
 
@@ -78,6 +79,8 @@ With no keys, the app runs on demo data and the chat explains how to add a model
 | Command | What it does |
 |---|---|
 | `npm run check:env` | Live-checks PayPal OAuth, each PayPal API, the LLM and the AG Studio license |
+| `npm run sandbox:subscription` | Creates the Coffee Club product + 4 plans and a subscription a sandbox buyer approves (`-- --plan monthly`, `biweekly`, `office` or `trial`; `--cancel`, `--suspend`) |
+| `npm run sandbox:buyer-order` | One PayPal checkout a sandbox buyer pays or cancels (`-- --item grinder`, `--amount 0.01`, `--decline`) |
 | `npm run seed:sandbox` | Creates payments, refunds and overdue invoices in your PayPal sandbox (`-- --payments 100 --refunds 21 --invoices 30`; invoices only: `-- --payments 0 --invoices 30`) |
 | `npm test` | Unit tests (55): analytics, actions, LLM stream, toolkit, exports, forecast, alerts, MCP, multi-business isolation, portfolio, drill-down, Power BI feed |
 | `npm run e2e` | Browser test of the full agent → tool → Action Center → approve loop (also `e2e:exports`, `e2e:policies`, `e2e:tanda2`, `e2e:tanda3`, `e2e:tanda4`) |
@@ -103,7 +106,7 @@ Rules are checked when the AI proposes **and** again at approval time. With `DAT
 
 ## MCP server
 
-`POST /api/mcp` – Streamable HTTP, stateless JSON-RPC (protocol 2025-06-18 / 2025-03-26 / 2024-11-05). 17 tools: KPIs, portfolio, anomalies, transactions, disputes, invoices, forecast, all `propose_*` actions, report links, pending approvals. Auth: `Authorization: Bearer $MCP_API_KEY` (required with live data; open in demo mode). Send `X-Business: <id>` to target another business. Claude Desktop:
+`POST /api/mcp` – Streamable HTTP, stateless JSON-RPC (protocol 2025-06-18 / 2025-03-26 / 2024-11-05). 18 tools: KPIs, portfolio, subscriptions (MRR, churn), anomalies, transactions, disputes, invoices, forecast, all `propose_*` actions, report links, pending approvals. Auth: `Authorization: Bearer $MCP_API_KEY` (required with live data; open in demo mode). Send `X-Business: <id>` to target another business. Claude Desktop:
 
 ```json
 { "mcpServers": { "merchantpilot": { "command": "npx", "args": ["-y", "mcp-remote", "https://<app>/api/mcp", "--header", "Authorization:${AUTH_HEADER}"], "env": { "AUTH_HEADER": "Bearer <MCP_API_KEY>" } } } }

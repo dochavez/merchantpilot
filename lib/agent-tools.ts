@@ -7,7 +7,7 @@
 import { z } from 'zod';
 import { dataMode } from './config';
 import { getDataset } from './data';
-import { detectAnomalies, disputeContext, findTransactions, overview } from './analytics';
+import { detectAnomalies, disputeContext, findTransactions, overview, subscriptionMetrics } from './analytics';
 import { forecastCashflow } from './forecast';
 import { listActions, proposeAction } from './actions';
 import type { ProposedAction } from './types';
@@ -32,6 +32,13 @@ const schemas = {
   paypal_list_invoices: z.object({ overdueOnly: z.boolean().optional(), status: z.string().optional() }),
   paypal_list_actions: z.object({}).passthrough(),
   portfolio_overview: z.object({}).passthrough(),
+  paypal_subscriptions: z.object({
+    status: z.string().optional(),
+    plan: z.string().optional(),
+    subscriptionId: z.string().optional(),
+    periodDays: z.number().int().min(7).max(90).optional(),
+    limit: z.number().int().min(1).max(100).optional(),
+  }),
   paypal_forecast: z.object({
     days: z.number().int().min(7).max(120).optional(),
     fixRefundSpike: z.boolean().optional(),
@@ -141,7 +148,34 @@ export async function runAgentTool(name: string, rawArgs: unknown): Promise<unkn
         overdueAmount: sum(rows.filter((i) => i.daysOverdue > 0)),
         byCustomer,
         note: 'Use these totals verbatim; do not add amounts yourself. Skip invoices with lastReminderAt in the last 3 days.',
-        invoices: rows,
+        invoices: rows.map(({ items, ...rest }) => ({ ...rest, products: rest.itemsSummary ?? (items ?? []).map((l) => `${l.name} x${l.quantity}`).join(', ') })),
+      };
+    }
+    case 'paypal_subscriptions': {
+      let subs = ds.subscriptions ?? [];
+      if (args.subscriptionId && !subs.some((x) => x.subscriptionId === args.subscriptionId) && dataMode() === 'live') {
+        // Not seen yet (no webhook / payment): read it from PayPal and remember it.
+        const { fetchLiveSubscriptions, trackSubscriptionId } = await import('./paypal/live-data');
+        await trackSubscriptionId(args.subscriptionId);
+        const { invalidateDataset } = await import('./data');
+        invalidateDataset();
+        subs = (await getDataset()).subscriptions ?? (await fetchLiveSubscriptions([]));
+      }
+      const lc = (x?: string) => x?.toLowerCase() ?? '';
+      const rows = subs.filter(
+        (x) =>
+          (!args.subscriptionId || x.subscriptionId === args.subscriptionId) &&
+          (!args.status || lc(x.status) === lc(args.status)) &&
+          (!args.plan || lc(x.planName).includes(lc(args.plan))),
+      );
+      const m = subscriptionMetrics({ ...ds, subscriptions: subs }, args.periodDays ?? 30);
+      return {
+        ...m,
+        note: m.hasSubscriptions
+          ? 'MRR = monthly recurring revenue from ACTIVE subscriptions; mrrAtRisk = SUSPENDED (failed payments). Quote these numbers verbatim.'
+          : 'No PayPal subscriptions found for this business. In live mode they appear after the first recurring payment or a BILLING.SUBSCRIPTION webhook.',
+        matching: rows.length,
+        subscriptions: rows.slice(0, args.limit ?? 25),
       };
     }
     case 'paypal_list_actions':

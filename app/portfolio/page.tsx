@@ -109,6 +109,8 @@ export default function PortfolioPage() {
         stake: b.moneyAtStake ?? null,
         upside: b.forecast30?.upside ?? null,
         pending: b.pendingApprovals ?? null,
+        mrr: b.recurring?.mrr ?? null,
+        churn: b.recurring?.churnRatePct ?? null,
         issue: b.error ?? b.topFindings?.[0]?.title ?? '—',
       })),
     [p],
@@ -126,6 +128,8 @@ export default function PortfolioPage() {
     { field: 'net', headerName: 'Net revenue', valueFormatter: m, width: 125 },
     { field: 'stake', headerName: 'Money at stake', valueFormatter: m, width: 130, cellStyle: { color: '#B91C1C', fontWeight: 600 } },
     { field: 'upside', headerName: '30d upside', valueFormatter: m, width: 115, cellStyle: { color: '#047857' } },
+    { field: 'mrr', headerName: 'MRR', valueFormatter: m, width: 110 },
+    { field: 'churn', headerName: 'Churn 30d', width: 105, valueFormatter: (v: any) => (v.value === null ? '—' : `${v.value}%`) },
     { field: 'pending', headerName: 'Approvals', width: 105 },
     { field: 'issue', headerName: 'Top issue', flex: 1, minWidth: 260 },
   ];
@@ -208,7 +212,7 @@ export default function PortfolioPage() {
                       <div className="mt-2">
                         <Spark data={b.weekly ?? []} />
                       </div>
-                      <dl className="mt-2 grid grid-cols-3 gap-2 text-[11px]">
+                      <dl className={`mt-2 grid gap-2 text-[11px] ${b.recurring ? 'grid-cols-4' : 'grid-cols-3'}`}>
                         <div>
                           <dt className="text-[var(--muted)]">Refunds</dt>
                           <dd className="font-semibold">{b.kpis?.refundRatePct}%</dd>
@@ -221,6 +225,12 @@ export default function PortfolioPage() {
                           <dt className="text-[var(--muted)]">30d upside</dt>
                           <dd className="font-semibold text-emerald-700">{money(b.forecast30?.upside, b.currency)}</dd>
                         </div>
+                        {b.recurring && (
+                          <div title={`${b.recurring.activeSubscribers} active subscribers · churn ${b.recurring.churnRatePct}% · ${money(b.recurring.mrrAtRisk, b.currency)} MRR at risk`}>
+                            <dt className="text-[var(--muted)]">MRR</dt>
+                            <dd className="font-semibold">{money(b.recurring.mrr, b.currency)}</dd>
+                          </div>
+                        )}
                       </dl>
                       <ul className="mt-2 space-y-0.5 text-[11px]">
                         {b.health?.reasons.slice(0, 3).map((r) => (

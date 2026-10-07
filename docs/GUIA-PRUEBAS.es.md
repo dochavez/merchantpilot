@@ -31,7 +31,7 @@ Un webhook es un aviso que PayPal envía a MerchantPilot cada vez que pasa algo 
    ```
    https://merchantpilot.onrender.com/api/webhooks/paypal
    ```
-7. En **Event types**, marca estos 7 eventos (usa el buscador de la lista):
+7. En **Event types**, marca estos 12 eventos (usa el buscador de la lista):
    - `Customer dispute created`  (CUSTOMER.DISPUTE.CREATED)
    - `Customer dispute updated`  (CUSTOMER.DISPUTE.UPDATED)
    - `Customer dispute resolved` (CUSTOMER.DISPUTE.RESOLVED)
@@ -39,6 +39,13 @@ Un webhook es un aviso que PayPal envía a MerchantPilot cada vez que pasa algo 
    - `Payment capture refunded`  (PAYMENT.CAPTURE.REFUNDED)
    - `Payment capture reversed`  (PAYMENT.CAPTURE.REVERSED)
    - `Invoicing invoice paid`    (INVOICING.INVOICE.PAID)
+   - `Billing subscription activated`      (BILLING.SUBSCRIPTION.ACTIVATED)
+   - `Billing subscription cancelled`      (BILLING.SUBSCRIPTION.CANCELLED)
+   - `Billing subscription suspended`      (BILLING.SUBSCRIPTION.SUSPENDED)
+   - `Billing subscription payment failed` (BILLING.SUBSCRIPTION.PAYMENT.FAILED)
+   - `Payment sale completed`              (PAYMENT.SALE.COMPLETED – cobros de suscripciones)
+
+   ¿Ya habías creado el webhook? Ábrelo en **Sandbox Webhooks** → **Edit** y agrega los 5 eventos de suscripciones; el Webhook ID no cambia.
 8. Pulsa **Save**. El webhook aparece en la lista con un **Webhook ID** (unos 17 caracteres, por ejemplo `8PT59734XY123456A`). Cópialo.
 
 ### 1.2 Decirle a Render cuál es el webhook
@@ -105,14 +112,14 @@ $h = @{ Authorization = "Bearer $key"; Accept = "application/json, text/event-st
 # 1) Conectar
 Invoke-RestMethod -Method Post -Uri $url -Headers $h -ContentType "application/json" -Body '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"prueba","version":"1"}}}' | ConvertTo-Json -Depth 5
 
-# 2) Ver las herramientas (deben ser 17)
+# 2) Ver las herramientas (deben ser 18)
 (Invoke-RestMethod -Method Post -Uri $url -Headers $h -ContentType "application/json" -Body '{"jsonrpc":"2.0","id":2,"method":"tools/list"}').result.tools | Select-Object name
 
 # 3) Ejecutar una herramienta: KPIs de los últimos 30 días
 (Invoke-RestMethod -Method Post -Uri $url -Headers $h -ContentType "application/json" -Body '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"paypal_overview","arguments":{"periodDays":30}}}').result.content[0].text
 ```
 
-Debes ver: `serverInfo.name = merchantpilot`, la lista de 17 herramientas y un JSON con ventas, reembolsos y disputas. Si sale **401**, la clave está mal copiada.
+Debes ver: `serverInfo.name = merchantpilot`, la lista de 18 herramientas y un JSON con ventas, reembolsos y disputas. Si sale **401**, la clave está mal copiada.
 
 ### 3.3 MCP Inspector (la herramienta oficial, visual)
 
@@ -126,7 +133,7 @@ Debes ver: `serverInfo.name = merchantpilot`, la lista de 17 herramientas y un J
    - **URL**: `https://merchantpilot.onrender.com/api/mcp`
    - **Authentication** (despliégalo): **Header Name** `Authorization`, **Bearer Token**: tu `MCP_API_KEY` (sin escribir "Bearer").
 3. Pulsa **Connect**. Debe decir **Connected** en verde.
-4. Pestaña **Tools** → **List Tools** → aparecen las 17.
+4. Pestaña **Tools** → **List Tools** → aparecen las 18.
 5. Prueba estas, una por una (clic en la herramienta → llenar campos → **Run Tool**):
    - `paypal_overview` → periodDays `30`
    - `paypal_detect_anomalies`
@@ -289,12 +296,105 @@ Resend es un servicio gratuito (100 correos al día) que permite que la app env�
 
 ---
 
+## 9. Los 5 escenarios de PayPal ("Test the unhappy paths too")
+
+Haz cada escenario con el dashboard abierto en el **negocio principal** y anota el resultado. Cuenta Personal = comprador; cuenta Business = la tienda.
+
+### 01 · Pago exitoso (happy path)
+
+1. `npm run sandbox:buyer-order` → abre el enlace → entra con la cuenta **Personal** → **Pagar**.
+2. Se abre una página verde **Payment approved** (localhost) y la terminal dice **✔ Captured …**. Copia ese ID de captura.
+3. **Esperado en MerchantPilot:** en 10–30 s, 🔔 **New sale 79.00 USD**. En `/api/webhooks/paypal`: `PAYMENT.CAPTURE.COMPLETED`, `verified: true`.
+
+### 02 · Checkout cancelado (el comprador se va)
+
+1. `npm run sandbox:buyer-order` → abre el enlace → entra con la cuenta Personal → **Cancel and return to Altura Coffee Supply** (abajo).
+2. Se abre una página naranja **Checkout cancelled** y la terminal dice **✖ Checkout cancelled by the buyer. Nothing was charged.**
+3. **Esperado en MerchantPilot:** nada nuevo (ni venta, ni aviso, ni cambio en KPIs). Eso es lo correcto: no hubo dinero.
+
+### 03 · Usuarios diferentes (comprador nuevo, otro país)
+
+1. Developer Dashboard → **Testing Tools → Sandbox Accounts → Create account** → **Personal**, país **Mexico** (o Canada) → **Create**. Anota correo y contraseña (⋯ → View/Edit account).
+2. En una **ventana privada**: `npm run sandbox:buyer-order -- --item grinder` y paga con esa cuenta nueva.
+3. Repite con un producto digital y otro monto: `npm run sandbox:buyer-order -- --item course` (sin envío).
+4. **Esperado:** aviso 🔔 de cada venta. Cuando PayPal la incluya en la búsqueda de transacciones (puede tardar hasta 3 h), el cliente aparece en el dashboard con su país; haz clic en su nombre para ver el panel **Customer** (cliente nuevo, 1 pedido).
+
+### 04 · Reembolso (desde el lado del vendedor)
+
+Tres formas; prueba al menos A y B:
+
+- **A. Con aprobación en MerchantPilot (la principal):** en el chat escribe *"Reembolsa la captura XXXXXXXX"* (el ID del escenario 01). Aparece la tarjeta de propuesta → **Approve**. Esperado: estado **Executed**, aviso 🔔 **Refund issued 79.00 USD**, y la acción queda en el Action Center / auditoría.
+- **B. Reembolso parcial:** *"Reembolsa 20 USD de la captura XXXXXXXX"* → Approve. Esperado: **Refund issued 20.00 USD**.
+- **C. Directo en PayPal:** entra a `https://www.sandbox.paypal.com` con la cuenta **Business** → Actividad → el pago → **Reembolsar**. Esperado: aviso 🔔 por webhook aunque no se hizo desde MerchantPilot.
+- **Ver los dos lados:** en dos ventanas privadas, cuenta Business (ve el +79 y el reembolso) y cuenta Personal (ve el −79 y la devolución). Toma captura para Devpost.
+
+### 05 · Fallos y casos límite (¿qué se rompe?)
+
+| # | Prueba | Cómo | Esperado |
+|---|--------|------|----------|
+| a | Pago rechazado | `npm run sandbox:buyer-order -- --decline` y paga | Terminal: **✖ Capture declined: … INSTRUMENT_DECLINED**. MerchantPilot: sin venta ni aviso |
+| b | Reembolsar de más | En el chat: *"Reembolsa 500 USD de la captura XXXXXXXX"* (de 79) | La IA no puede crear la propuesta: *refundable balance is …* |
+| c | Doble reembolso | Pide otra vez el reembolso total de una captura ya reembolsada (escenario 04 A) y aprueba si llega a proponerse | Bloqueado al proponer (*already fully refunded*) o la acción queda **Failed** con el mensaje de PayPal; nunca se cobra dos veces |
+| d | Enlace de aprobación usado dos veces | Abre de nuevo un enlace de aprobación ya usado (MCP o resumen matutino) | La página dice *This action is already executed*; no se repite |
+| e | Webhook falso | En PowerShell: `Invoke-RestMethod -Method Post -Uri https://merchantpilot.onrender.com/api/webhooks/paypal -ContentType application/json -Body '{"event_type":"CUSTOMER.DISPUTE.CREATED","resource":{"dispute_id":"FAKE"}}'` | Error **401** (firma inválida) y **ningún** aviso en la 🔔 |
+| f | MCP sin clave | `Invoke-RestMethod -Method Post -Uri https://merchantpilot.onrender.com/api/mcp -ContentType application/json -Body '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'` | Error **401** |
+| g | Regla de límite diario | ⚖ Rules → *Daily money-out limit* = 50 → pide un reembolso de 79 y pulsa Approve | No se ejecuta: *Daily money-out limit of 50.00 would be exceeded…*. Después regresa el límite a su valor (2000) |
+| h | Monto mínimo | `npm run sandbox:buyer-order -- --amount 0.01` y paga | Venta de 0.01 USD con su aviso; los KPIs no se rompen |
+
+Si algún resultado no coincide con el "esperado", toma captura de la terminal y de la 🔔 y lo revisamos.
+
+---
+
+## 10. Suscripciones (ingresos recurrentes) y facturas con productos
+
+### 10.1 Facturas con productos
+
+`npm run seed:sandbox -- --payments 0 --invoices 20` ahora crea cada factura con **productos del catálogo** (por ejemplo *Burr Grinder Pro ×2, Paper Filters x200 ×10*). En MerchantPilot haz clic en un número de factura: el panel muestra la sección **Products on this invoice** (artículo, cantidad, precio y total). La columna **Products** también aparece en el Excel, en Power BI (tabla `InvoiceLines`) y para la IA.
+
+### 10.2 Crear suscripciones en sandbox
+
+PayPal no permite que el vendedor active suscripciones sin la aprobación del comprador, así que cada una necesita un clic con la cuenta **Personal**.
+
+1. Planes (solo la primera vez; crea el producto "Altura Coffee Club" y 4 planes):
+   ```
+   npm run sandbox:subscription -- --plans-only
+   ```
+2. Una suscripción:
+   ```
+   npm run sandbox:subscription -- --plan monthly
+   ```
+   Abre el enlace → entra con la cuenta Personal → **Agree & Subscribe**. La terminal dice **✔ I-XXXX is ACTIVE** y PayPal cobra el primer mes.
+3. Repite con otros planes y compradores (ventana privada):
+
+   | Comando | Qué prueba |
+   |---------|-----------|
+   | `-- --plan biweekly` | Cobro cada 2 semanas (MRR normalizado a mensual) |
+   | `-- --plan office` | Plan de 149 USD (cliente de alto valor) |
+   | `-- --plan trial` | 7 días gratis, luego 29 USD |
+   | `-- --plan monthly --cancel` | **Cancelación** → aviso 🔔 *Subscription cancelled* y sube el churn |
+   | `-- --plan monthly --suspend` | **Suspendida** → aviso 🔔 y cuenta como *MRR at risk* |
+   | Cancelar en la página de PayPal | Alta abandonada: no se cobra nada |
+
+4. **Esperado en MerchantPilot** (con los 5 eventos nuevos del webhook): en menos de un minuto aparece el aviso 🔔 y la suscripción en la fuente de datos **PayPal subscriptions**. Si no configuraste esos eventos, pregúntale a la IA: *"Muéstrame la suscripción I-XXXX"*; la lee de PayPal y la sigue desde entonces. Los cobros también aparecen en transacciones (tipo *Subscription*) cuando PayPal los incluye en la búsqueda de transacciones (hasta 3 h).
+
+### 10.3 Qué ver en la app
+
+- Chat: *"¿Cuánto es mi MRR y cuál plan pierde más suscriptores?"* (herramienta `paypal_subscriptions`).
+- Clic en un **Subscription ID** (o en *Subscription* dentro de una transacción): plan, valor mensual, antigüedad, próximos cobros, pagos fallidos y botón **Recover this subscriber** / **Win them back**.
+- **Portafolio**: columna **MRR** y **Churn 30d** por negocio, y una línea de ingresos recurrentes en el resumen.
+- **PDF**: sección *Recurring revenue* con la tabla por plan. **Excel completo**: hoja *Subscriptions*. **Power BI**: tabla `Subscriptions` y columnas `Mrr`, `ActiveSubscribers`, `ChurnRatePct` en `Kpis` y `Businesses`.
+- En modo demo los 3 negocios ya traen suscripciones con historia: el plan *Bi-weekly* de Altura Coffee Supply pierde suscriptores y hay suscripciones suspendidas por pagos fallidos.
+
+---
+
 ## Lista de verificación final
 
 - [ ] Webhook creado, `PAYPAL_WEBHOOK_ID` en Render y `/api/webhooks/paypal` muestra `verified: true`
 - [ ] Al menos 1 disputa real abierta por el comprador sandbox
-- [ ] MCP: PowerShell muestra 17 herramientas; el Inspector ejecuta `paypal_overview`
+- [ ] MCP: PowerShell muestra 18 herramientas; el Inspector ejecuta `paypal_overview`
 - [ ] Power BI: tablero con segmentación por negocio guardado como `.pbix` (captura para Devpost)
 - [ ] Portafolio con 3 o más negocios y PDF consolidado descargado
 - [ ] Clic en factura, cliente y disputa abre el panel de detalle
 - [ ] Correo del resumen recibido
+- [ ] Los 5 escenarios de la sección 9 (pago, cancelado, otro comprador, reembolso, fallos)
+- [ ] Al menos 3 suscripciones (una cancelada y una suspendida) y facturas con productos (sección 10)

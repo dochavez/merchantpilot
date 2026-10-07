@@ -224,7 +224,7 @@ function McpDialog({ onClose }: { onClose: () => void }) {
           </button>
         </div>
         <p className="mt-1 text-xs text-[var(--muted)]">
-          17 tools (KPIs, portfolio, anomalies, disputes, invoices, forecast, proposals, reports). Proposals still need your approval: each one comes back with a signed approve link.
+          18 tools (KPIs, portfolio, subscriptions, anomalies, disputes, invoices, forecast, proposals, reports). Proposals still need your approval: each one comes back with a signed approve link.
         </p>
         <label className="mt-3 block text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">Endpoint (Streamable HTTP)</label>
         <code className="mt-1 block break-all rounded bg-[var(--hover)] px-2 py-1.5 text-xs">{url}</code>

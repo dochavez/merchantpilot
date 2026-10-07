@@ -4,6 +4,7 @@
  */
 import type { ReportModel } from './report-model';
 import { forecastCashflow } from '../forecast';
+import { subscriptionMetrics } from '../analytics';
 
 export type EdmType = 'Edm.String' | 'Edm.Decimal' | 'Edm.Int32' | 'Edm.Date' | 'Edm.DateTimeOffset' | 'Edm.Boolean';
 export interface EntityColumn {
@@ -47,6 +48,8 @@ export const ENTITIES: EntityDef[] = [
       d('Net', 'net'),
       s('Currency', 'currency'),
       s('RelatedTransactionId', 'relatedTransactionId'),
+      s('SubscriptionId', 'subscriptionId'),
+      { name: 'SaleType', type: 'Edm.String', get: (r) => (r.type !== 'Payment' ? null : r.subscriptionId ? 'Subscription' : r.invoiceId ? 'Invoice' : 'One-off') },
     ],
     rows: (m) => m.dataset.transactions,
   },
@@ -87,8 +90,41 @@ export const ENTITIES: EntityDef[] = [
       date('DueDate', 'dueDate'),
       i('DaysOverdue', 'daysOverdue'),
       ts('LastReminderAt', 'lastReminderAt'),
+      s('Products', 'itemsSummary'),
     ],
     rows: (m) => m.dataset.invoices,
+  },
+  {
+    name: 'InvoiceLines',
+    description: 'Products on each invoice (one row per line item).',
+    key: 'LineId',
+    columns: [s('LineId', 'lineId'), s('InvoiceId', 'invoiceId'), s('InvoiceNumber', 'invoiceNumber'), s('Product', 'name'), d('Quantity', 'quantity'), d('UnitPrice', 'unitPrice'), d('Total', 'total')],
+    rows: (m) => m.dataset.invoices.flatMap((inv) => (inv.items ?? []).map((l, n) => ({ ...l, lineId: `${inv.invoiceId}-${n + 1}`, invoiceId: inv.invoiceId, invoiceNumber: inv.invoiceNumber }))),
+  },
+  {
+    name: 'Subscriptions',
+    description: 'PayPal subscriptions (recurring billing): plan, status, price per cycle, monthly value (MRR) and dates.',
+    key: 'SubscriptionId',
+    columns: [
+      s('SubscriptionId', 'subscriptionId'),
+      s('PlanId', 'planId'),
+      s('Plan', 'planName'),
+      s('Status', 'status'),
+      s('SubscriberName', 'subscriberName'),
+      s('SubscriberEmail', 'subscriberEmail'),
+      s('Country', 'country'),
+      d('Price', 'amount'),
+      s('Currency', 'currency'),
+      s('Interval', 'interval'),
+      i('IntervalCount', 'intervalCount'),
+      d('MonthlyValue', 'monthlyValue'),
+      date('StartDate', 'startDate'),
+      date('NextBillingDate', 'nextBillingDate'),
+      date('LastPaymentDate', 'lastPaymentDate'),
+      date('CancelledDate', 'cancelledDate'),
+      i('FailedPayments', 'failedPayments'),
+    ],
+    rows: (m) => m.dataset.subscriptions ?? [],
   },
   {
     name: 'WeeklyTrend',
@@ -167,8 +203,15 @@ export const ENTITIES: EntityDef[] = [
       d('OverdueInvoiceTotal', 'overdueInvoiceTotal'),
       d('MoneyAtStake', 'moneyAtStake'),
       s('Currency', 'currency'),
+      d('Mrr', 'mrr'),
+      i('ActiveSubscribers', 'activeSubscribers'),
+      d('ChurnRatePct', 'churnRatePct'),
+      d('MrrAtRisk', 'mrrAtRisk'),
     ],
-    rows: (m) => [{ ...m.kpis, moneyAtStake: m.moneyAtStake }],
+    rows: (m) => {
+      const sm = subscriptionMetrics(m.dataset, m.periodDays);
+      return [{ ...m.kpis, moneyAtStake: m.moneyAtStake, ...(sm.hasSubscriptions ? { mrr: sm.mrr, activeSubscribers: sm.activeSubscribers, churnRatePct: sm.churnRatePct, mrrAtRisk: sm.mrrAtRisk } : {}) }];
+    },
   },
 ];
 

@@ -42,6 +42,9 @@ export const BUSINESSES_ENTITY: EntityDef = {
     bi('OpenDisputes', 'openDisputes'),
     bi('OverdueInvoices', 'overdueInvoices'),
     bi('PendingApprovals', 'pendingApprovals'),
+    bd('Mrr', 'mrr'),
+    bi('ActiveSubscribers', 'activeSubscribers'),
+    bd('ChurnRatePct', 'churnRatePct'),
     bs('TopIssue', 'topIssue'),
   ],
   rows: () => [],
@@ -70,6 +73,9 @@ function businessRow(s: BusinessSnapshot) {
     openDisputes: k?.openDisputes,
     overdueInvoices: k?.overdueInvoices,
     pendingApprovals: s.pendingApprovals,
+    mrr: s.recurring?.mrr,
+    activeSubscribers: s.recurring?.activeSubscribers,
+    churnRatePct: s.recurring?.churnRatePct,
     topIssue: s.topFindings?.[0]?.title ?? s.error ?? null,
   };
 }

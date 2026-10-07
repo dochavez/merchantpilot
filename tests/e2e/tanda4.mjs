@@ -24,10 +24,18 @@ try {
   const drawer = page.getByTestId('detail-drawer');
   await drawer.getByText('TIMELINE', { exact: false }).first().waitFor({ timeout: 15000 });
   await drawer.getByRole('button', { name: /Prepare a reminder/ }).waitFor();
+  await drawer.getByTestId('invoice-items').waitFor({ timeout: 10000 }); // products on the invoice
   await drawer.getByTestId('link-customer').first().click();
   await drawer.getByText('Back').waitFor({ timeout: 15000 });
   await drawer.getByText('Back').click();
   await drawer.getByRole('button', { name: /Prepare a reminder/ }).waitFor({ timeout: 15000 });
+  await page.keyboard.press('Escape');
+
+  // 1b. Subscription drill-down (recurring revenue)
+  const sub = await page.evaluate(async () => (await (await fetch('/api/data')).json()).subscriptions.find((x) => x.status === 'SUSPENDED')?.subscriptionId);
+  if (!sub) throw new Error('demo has no suspended subscription');
+  await page.evaluate((id) => window.dispatchEvent(new CustomEvent('merchantpilot:open-detail', { detail: { kind: 'subscription', id } })), sub);
+  await drawer.getByRole('button', { name: /Recover this subscriber/ }).waitFor({ timeout: 15000 });
   await page.keyboard.press('Escape');
 
   // 2. Switch business → café dashboard
@@ -60,7 +68,7 @@ try {
   await page.waitForLoadState('networkidle');
 
   if (errors.length) throw new Error('page errors: ' + errors.join(' | '));
-  console.log(`✔ tanda4 passed: drill-down drawer, business switcher, portfolio (3 cards, grid, chart, PDF), OData /all (${tx['@odata.count']} rows)`);
+  console.log(`✔ tanda4 passed: drill-down drawer (invoice products, subscription), business switcher, portfolio (3 cards, grid, chart, PDF), OData /all (${tx['@odata.count']} rows)`);
 } catch (e) {
   await page.screenshot({ path: 'e2e-failure.png' });
   console.error('✘ tanda4 failed:', e.message);
