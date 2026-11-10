@@ -18,6 +18,10 @@ try {
   await page.evaluate(() => localStorage.clear());
   await page.reload({ waitUntil: 'networkidle' });
 
+  // 0. Recurring revenue widget on the default dashboard
+  await page.getByTestId('recurring-revenue').waitFor({ timeout: 30000 });
+  if (!/MRR/.test(await page.getByTestId('recurring-revenue').innerText())) throw new Error('recurring revenue widget has no MRR');
+
   // 1. Drill-down: click an invoice number in the grid → drawer → customer → back
   await page.getByTestId('drill-invoice').first().waitFor({ timeout: 30000 });
   await page.getByTestId('drill-invoice').first().click();
@@ -68,7 +72,7 @@ try {
   await page.waitForLoadState('networkidle');
 
   if (errors.length) throw new Error('page errors: ' + errors.join(' | '));
-  console.log(`✔ tanda4 passed: drill-down drawer (invoice products, subscription), business switcher, portfolio (3 cards, grid, chart, PDF), OData /all (${tx['@odata.count']} rows)`);
+  console.log(`✔ tanda4 passed: recurring revenue widget, drill-down drawer (invoice products, subscription), business switcher, portfolio (3 cards, grid, chart, PDF), OData /all (${tx['@odata.count']} rows)`);
 } catch (e) {
   await page.screenshot({ path: 'e2e-failure.png' });
   console.error('✘ tanda4 failed:', e.message);

@@ -110,6 +110,9 @@ export function createMockModel(): LanguageModel {
           parts = inv
             ? call('propose_invoice_reminder', { invoiceId: inv.invoiceId, note: 'Friendly reminder from Altura Coffee Supply.', rationale: `${inv.invoiceNumber} is ${inv.daysOverdue} days overdue.` })
             : text('No overdue invoices.');
+        } else if (r.toolName === 'paypal_subscriptions') {
+          const v = value?.result ?? value ?? {};
+          parts = text(`Recurring revenue: MRR ${v.mrr} ${v.currency ?? ''} from ${v.activeSubscribers} active subscribers; churn ${v.churnRatePct}% (previous ${v.churnRatePrevPct}%); ${v.mrrAtRisk} at risk from ${v.suspendedSubscribers} suspended subscriptions.`);
         } else if (r.toolName === 'create_report') {
           parts = text('Your report is ready – use the download card above.');
         } else if (r.toolName === 'propose_invoice_reminder') {
@@ -139,6 +142,8 @@ export function createMockModel(): LanguageModel {
         parts = call('create_report', { format: userText.includes('excel') ? 'xlsx' : userText.includes('power bi') ? 'powerbi' : 'pdf' });
       } else if (userText.includes('dispute') && toolNames.has('propose_dispute_evidence')) {
         parts = call('paypal_list_disputes', { status: 'open' });
+      } else if ((userText.includes('recurring') || userText.includes('subscription') || userText.includes('mrr')) && toolNames.has('paypal_subscriptions')) {
+        parts = call('paypal_subscriptions', {});
       } else if (userText.includes('forecast') && toolNames.has('paypal_forecast')) {
         parts = call('paypal_forecast', { days: 60, fixRefundSpike: true, collectOverdue: true });
       } else if (userText.includes('invoice')) {

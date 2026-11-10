@@ -16,6 +16,7 @@ import { INITIAL_REPORT } from './initial-report';
 import { AUTO_OPEN_PREFIXES, TOOL_DISPLAY } from './tool-display';
 import { ASK_AI_EVENT, moneyAtStakeWidget } from './MoneyAtStakeWidget';
 import { cashflowForecastWidget } from './CashflowForecastWidget';
+import { recurringRevenueWidget } from './RecurringRevenueWidget';
 import { currentBusinessId } from '../business-client';
 import { makeDrillCell } from './DrillCell';
 
@@ -23,7 +24,7 @@ const licenseKey = process.env.NEXT_PUBLIC_AG_STUDIO_LICENSE_KEY;
 if (licenseKey) AgStudioLicenseManager.setLicenseKey(licenseKey);
 
 const STUDIO_MODULES = [AgStudioAiModule];
-const STATE_BASE = 'merchantpilot.studioState.v3';
+const STATE_BASE = 'merchantpilot.studioState.v4';
 /** Each business keeps its own dashboard layout. */
 const stateKey = () => `${STATE_BASE}:${currentBusinessId()}`;
 
@@ -53,8 +54,8 @@ const createCellRenderer = (field: any) => DRILL_CELLS[field?.context?.drill as 
 
 const WIDGETS = (w: any) => ({
   ...w,
-  widgets: [...w.widgets.map((d: any) => (d.id === 'grid' ? { ...d, options: { ...(d.options ?? {}), createCellRenderer } } : d)), moneyAtStakeWidget, cashflowForecastWidget],
-  menu: [...w.menu, { label: 'MerchantPilot', widgetIds: ['money-at-stake', 'cashflow-forecast'] }],
+  widgets: [...w.widgets.map((d: any) => (d.id === 'grid' ? { ...d, options: { ...(d.options ?? {}), createCellRenderer } } : d)), moneyAtStakeWidget, cashflowForecastWidget, recurringRevenueWidget],
+  menu: [...w.menu, { label: 'MerchantPilot', widgetIds: ['money-at-stake', 'cashflow-forecast', 'recurring-revenue'] }],
 });
 
 function loadSavedState(): AgReportState | undefined {

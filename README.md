@@ -1,12 +1,16 @@
 # MerchantPilot
 
-**An AI finance copilot for small PayPal merchants.** It explains what changed in your money, shows the proof on a live AG Studio dashboard, and prepares the fixes (refunds, invoice reminders, dispute actions). Each fix waits for your approval, then runs through the PayPal Agent Toolkit.
+**An AI finance copilot for small PayPal merchants.** It explains what changed in your money, shows the proof on a live AG Studio dashboard, and prepares the fixes (refunds, invoice reminders, payment plans, dispute responses). Each fix waits for your approval, then runs through the PayPal Agent Toolkit. It also tracks recurring revenue (PayPal Subscriptions), compares several businesses, forecasts cash and works from Claude/Cursor (MCP), Power BI, Excel and voice.
 
 Built for the [PayPal AI Hackathon 2026](https://paypalaihackathon.devpost.com).
 
-> **Live demo:** `https://<your-app>.onrender.com` · **Video:** `<YouTube link>`
+> **Live demo:** https://merchantpilot.onrender.com · **Video:** `<YouTube link – add before submitting>` · **Judge quick start:** on the home page
 
-![MerchantPilot dashboard](docs/screenshots/dashboard.png)
+![MerchantPilot dashboard](public/screenshots/dashboard.png)
+
+| Approve in the chat | Portfolio of businesses | Click anything for details |
+|---|---|---|
+| ![Approval card](public/screenshots/approval.png) | ![Portfolio](public/screenshots/portfolio.png) | ![Detail drawer](public/screenshots/drawer.png) |
 
 ---
 
@@ -32,24 +36,26 @@ Small merchants live inside PayPal but can't see *why* their money moves. Refund
 ## Architecture
 
 ```
-Browser                                            Server (Next.js on Render)
-┌───────────────────────────────────────────┐      ┌────────────────────────────────────────┐
-│ AG Studio (dashboard + AI chat panel)      │      │ /api/llm      → AI SDK → OpenAI/Claude │
-│  ├─ MerchantPilot agent  (custom, primary) ├─────►│   (key stays on server, NDJSON stream) │
-│  │    tools: paypal_* / propose_*          │      │ /api/agent/tools/:name                 │
-│  │    delegate_to → lead                   │      │   analytics + PayPal reads (REST)      │
-│  └─ Studio built-in agents: lead, data,    │      │   propose_* → Action queue             │
-│       page, planning, widget               │      │ /api/actions/:id  approve              │
-│ Action Center (approve / reject)           ├─────►│   → PayPal Agent Toolkit               │
-└───────────────────────────────────────────┘      │     (create_refund, send_invoice_      │
-                                                    │      reminder, accept_dispute_claim)   │
-PayPal webhooks ─────────────────────────────────► │ /api/webhooks/paypal (verified)        │
-                                                    └────────────────────────────────────────┘
+Browser                                              Server (Next.js on Render)
+┌─────────────────────────────────────────────┐      ┌──────────────────────────────────────────┐
+│ AG Studio (dashboard + AI chat panel)        │      │ /api/llm   → AI SDK → OpenAI / Claude    │
+│  ├─ MerchantPilot agent (custom, primary)    ├─────►│   (key stays on server, rate limited)    │
+│  │    tools: paypal_* / propose_* / reports  │      │ /api/agent/tools/:name                   │
+│  │    delegate_to → lead                     │      │   deterministic analytics, forecast,     │
+│  ├─ Studio built-in agents: lead, data, …    │      │   subscriptions, portfolio (lib/*.ts)    │
+│  ├─ Custom widgets: Money at stake,          │      │   propose_* → Action queue + rules       │
+│  │   Recurring revenue, Cash-flow forecast   │      │ /api/actions/:id approve (or signed link)│
+│  └─ Grid drill-down → detail drawer          │      │   → PayPal Agent Toolkit / REST          │
+│ Action Center · Portfolio · Alerts · Voice   ├─────►│ /api/odata (Power BI) · /api/export/*    │
+└─────────────────────────────────────────────┘      │ /api/mcp (Claude, Cursor, …)             │
+PayPal webhooks (signature verified) ──────────────► │ /api/webhooks/paypal → alerts            │
+                                                      │ Postgres: audit trail, rules, businesses │
+                                                      └──────────────────────────────────────────┘
 ```
 
 * **Studio Agent Framework:** a custom agent (`directLlmRunner`) talks to Studio's built-in agents through `delegate_to`. A custom `AgLlmAdapter` proxies every model turn to the server, so no API key reaches the browser. See `components/studio/`.
 * **PayPal:**
-  * Transaction Search, Disputes and Invoicing APIs feed the dashboard (`lib/paypal/live-data.ts`).
+  * Transaction Search, Disputes, Invoicing (with line items) and Subscriptions APIs feed the dashboard (`lib/paypal/live-data.ts`).
   * Money-moving operations run only through `@paypal/agent-toolkit`, with least-privilege tool configuration (`lib/paypal/toolkit.ts`).
   * Webhooks are signature-verified.
 * **Safety by design:**
@@ -59,7 +65,7 @@ PayPal webhooks ─────────────────────�
   * The server applies per-IP and daily rate limits to protect the AI budget.
 * **Two data modes:**
   * **live:** your PayPal sandbox account.
-  * **demo:** a deterministic 90-day dataset for a fictional coffee-gear shop, with built-in storylines. Judges always see a working product, and *Reset demo* restores it.
+  * **demo:** deterministic 90-day datasets for three fictional businesses (coffee-gear shop, café, online academy) with built-in storylines: a refund spike, a carrier dispute cluster, overdue invoices, a subscription churn spike and failed renewals. Judges always see a working product, and *Reset demo* restores it.
 
 ## Tech stack
 
@@ -82,13 +88,16 @@ With no keys, the app runs on demo data and the chat explains how to add a model
 | `npm run sandbox:subscription` | Creates the Coffee Club product + 4 plans and a subscription a sandbox buyer approves (`-- --plan monthly`, `biweekly`, `office` or `trial`; `--cancel`, `--suspend`) |
 | `npm run sandbox:buyer-order` | One PayPal checkout a sandbox buyer pays or cancels (`-- --item grinder`, `--amount 0.01`, `--decline`) |
 | `npm run seed:sandbox` | Creates payments, refunds and overdue invoices in your PayPal sandbox (`-- --payments 100 --refunds 21 --invoices 30`; invoices only: `-- --payments 0 --invoices 30`) |
-| `npm test` | Unit tests (55): analytics, actions, LLM stream, toolkit, exports, forecast, alerts, MCP, multi-business isolation, portfolio, drill-down, Power BI feed |
+| `npm test` | Unit tests (66): analytics, actions, LLM stream, toolkit, exports, forecast, alerts, MCP, multi-business isolation, portfolio, drill-down, Power BI feed, subscriptions |
 | `npm run e2e` | Browser test of the full agent → tool → Action Center → approve loop (also `e2e:exports`, `e2e:policies`, `e2e:tanda2`, `e2e:tanda3`, `e2e:tanda4`) |
 | `npm run smoke -- <url>` | Post-deploy check of a hosted instance |
 
 ## AG Studio extensions
 
 - **Custom widget "Money at stake"** (`components/studio/MoneyAtStakeWidget.tsx`): maps any money measures through Studio's data engine (filters apply), shows the recoverable total with a stacked breakdown and a **"Recover it with AI"** button that hands the job to MerchantPilot. Registered in Studio's widget menu under *MerchantPilot* and described to Studio's own AI agents (`ai` metadata), so they can place it too.
+- **Custom widget "Recurring revenue"** (`components/studio/RecurringRevenueWidget.tsx`): MRR/ARR, subscribers, churn vs previous period, MRR at risk from failed renewals, renewals due and each plan's share, with *Recover at-risk MRR* / *Why are they cancelling?* buttons.
+- **Custom widget "Cash-flow forecast & what-if"** (`components/studio/CashflowForecastWidget.tsx`): AG Charts projection with an 80% band and scenario toggles.
+- **Drill-down cells**: grid columns tagged with `context.drill` render as links that open a detail drawer (invoice products and timeline, customer value, dispute evidence, subscription history).
 - **In-chat cards** via `aiToolDisplay`: Approve/Reject proposals and download reports inside Studio's AI panel.
 - **Brand theme** via `studioTheme.withParams(...)`: PayPal blues, Inter, chart palette, softer widgets.
 - **Custom agent + Studio's built-in agents** via the Agent Framework (`createAiHarness`, `delegateTo`).
