@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic';
 
 const STEPS = [
   { t: 'Ask', d: '“Why are my refunds up?” MerchantPilot reads your PayPal transactions, disputes, invoices and subscriptions and finds the cause with deterministic analytics.' },
-  { t: 'See', d: 'It asks AG Studio’s built-in agents to add the chart that proves it, live on your dashboard. Click any invoice, customer or dispute for the full story.' },
+  { t: 'See', d: 'A five-page AG Studio report – sales, disputes, collections, subscriptions – and the AI adds the chart that proves each finding. Click any invoice, customer or dispute for the full story.' },
   { t: 'Approve', d: 'Refunds, reminders, payment plans and dispute responses are queued as cards. You approve; the PayPal Agent Toolkit executes. Your rules decide what runs alone.' },
 ];
 
@@ -34,6 +34,8 @@ const PAYPAL = [
 const SHOTS = [
   { src: '/screenshots/dashboard.png', alt: 'AG Studio dashboard with money at stake, recurring revenue, forecast and the AI assistant', caption: 'The dashboard: AG Studio widgets, custom MerchantPilot widgets and the AI assistant.' },
   { src: '/screenshots/approval.png', alt: 'A refund proposal card with Approve and Reject buttons inside the chat', caption: 'Nothing moves money until you click Approve.' },
+  { src: '/screenshots/sales.png', alt: 'Sales and customers page with treemap, sunburst, combo chart and filters', caption: 'Five report pages built with AG Studio: sales, disputes, collections and subscriptions.' },
+  { src: '/screenshots/subscriptions.png', alt: 'Subscriptions page with MRR, churn and failed renewals', caption: 'Recurring revenue: MRR, churn and the subscriptions at risk.' },
   { src: '/screenshots/portfolio.png', alt: 'Portfolio page comparing three businesses with health scores', caption: 'Portfolio: every business scored, compared and explained.' },
   { src: '/screenshots/drawer.png', alt: 'Invoice detail drawer showing products, timeline and AI actions', caption: 'Click anything for the details: invoice products, customer value, dispute evidence.' },
 ];

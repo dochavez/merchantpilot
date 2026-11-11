@@ -24,7 +24,7 @@ const licenseKey = process.env.NEXT_PUBLIC_AG_STUDIO_LICENSE_KEY;
 if (licenseKey) AgStudioLicenseManager.setLicenseKey(licenseKey);
 
 const STUDIO_MODULES = [AgStudioAiModule];
-const STATE_BASE = 'merchantpilot.studioState.v4';
+const STATE_BASE = 'merchantpilot.studioState.v5';
 /** Each business keeps its own dashboard layout. */
 const stateKey = () => `${STATE_BASE}:${currentBusinessId()}`;
 
@@ -67,6 +67,15 @@ function loadSavedState(): AgReportState | undefined {
   }
 }
 
+/** Names for the report pages (AG Studio keeps pages in its state but has no page selector UI). */
+const PAGE_NAMES: Record<string, string> = {
+  overview: 'Overview',
+  sales: 'Sales & customers',
+  risk: 'Disputes & refunds',
+  collections: 'Collections',
+  recurring: 'Subscriptions',
+};
+
 export interface StudioDashboardProps {
   dataset: Dataset;
   onApi?: (api: AgStudioApi) => void;
@@ -77,6 +86,22 @@ export default function StudioDashboard({ dataset, onApi }: StudioDashboardProps
   const data = useMemo(() => toStudioData(dataset), [dataset]);
   const [initialState] = useState<AgReportState | undefined>(() => loadSavedState() ?? (INITIAL_REPORT as unknown as AgReportState));
   const apiRef = useRef<AgStudioApi | null>(null);
+  const [pages, setPages] = useState<{ ids: string[]; selected: string }>(() => {
+    const st = initialState as any;
+    return { ids: (st?.pages ?? []).map((p: any) => p.id), selected: st?.selectedPageId ?? 'overview' };
+  });
+  const syncPages = useCallback(() => {
+    const st = apiRef.current?.getState() as any;
+    if (!st) return;
+    const ids = (st.pages ?? []).map((p: any) => p.id) as string[];
+    setPages((prev) => (prev.selected === st.selectedPageId && prev.ids.join() === ids.join() ? prev : { ids, selected: st.selectedPageId }));
+  }, []);
+  const goToPage = useCallback((id: string) => {
+    const api = apiRef.current;
+    if (!api) return;
+    api.setState({ ...(api.getState() as any), selectedPageId: id });
+    setPages((prev) => ({ ...prev, selected: id }));
+  }, []);
 
   const ai = useCallback((params: { api: AgStudioApi }) => buildHarness(params.api, adapter), [adapter]);
 
@@ -84,12 +109,13 @@ export default function StudioDashboard({ dataset, onApi }: StudioDashboardProps
   const onStateUpdated = useCallback(() => {
     const api = apiRef.current;
     if (!api) return;
+    syncPages();
     try {
       localStorage.setItem(stateKey(), JSON.stringify(api.getState()));
     } catch {
       /* storage unavailable: fine */
     }
-  }, []);
+  }, [syncPages]);
 
   useEffect(() => {
     if (process.env.NODE_ENV !== 'production' && apiRef.current) (window as any).__studioApi = apiRef.current;
@@ -141,7 +167,42 @@ export default function StudioDashboard({ dataset, onApi }: StudioDashboardProps
   }, []);
 
   return (
-    <div ref={hostRef} style={{ height: '100%', width: '100%' }}>
+    <div ref={hostRef} style={{ height: '100%', width: '100%', display: 'flex', flexDirection: 'column' }}>
+    {pages.ids.length > 1 && (
+      <nav
+        role="tablist"
+        aria-label="Report pages"
+        data-testid="report-pages"
+        style={{ display: 'flex', gap: 4, padding: '6px 12px 0', borderBottom: '1px solid var(--line, #e3e6eb)', overflowX: 'auto', flex: 'none', background: 'var(--panel, #fff)' }}
+      >
+        {pages.ids.map((id, i) => {
+          const active = id === pages.selected;
+          return (
+            <button
+              key={id}
+              role="tab"
+              aria-selected={active}
+              onClick={() => goToPage(id)}
+              data-testid={`page-tab-${id}`}
+              style={{
+                border: 0,
+                borderBottom: `2px solid ${active ? '#0070E0' : 'transparent'}`,
+                background: 'transparent',
+                padding: '6px 12px 8px',
+                fontSize: 13,
+                fontWeight: active ? 700 : 500,
+                color: active ? '#0070E0' : 'var(--muted, #5d6573)',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {PAGE_NAMES[id] ?? `Page ${i + 1}`}
+            </button>
+          );
+        })}
+      </nav>
+    )}
+    <div style={{ flex: 1, minHeight: 0 }}>
     <AgStudio
       style={{ height: '100%', width: '100%' }}
       mode="edit"
@@ -156,12 +217,14 @@ export default function StudioDashboard({ dataset, onApi }: StudioDashboardProps
       panels={{ edit: { left: ['data', 'edit', 'filters'], right: ['ai'] } }}
       onApiReady={(e: any) => {
         apiRef.current = e.api;
+        syncPages();
         if (process.env.NODE_ENV !== 'production') (window as any).__studioApi = e.api;
         onApi?.(e.api);
       }}
       onStateUpdated={onStateUpdated}
       onErrorRaised={(e: any) => console.warn('[AG Studio]', e)}
     />
+    </div>
     </div>
   );
 }

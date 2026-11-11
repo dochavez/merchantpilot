@@ -155,7 +155,7 @@ Prepara: dashboard de MerchantPilot abierto en el navegador con el **negocio pri
 4. **Cierre** (frase para el video):
    > "El MCP de PayPal da las operaciones. MerchantPilot agrega inteligencia, reglas y aprobación humana: la IA propone, el dueño decide."
 
-Variante sin reembolso: *"Usa paypal-sandbox: crea una factura de 250 USD para Hotel Antigua Central y envíala"* → *"Usa merchantpilot: ¿qué facturas tengo pendientes? Prepara recordatorios."*
+Variante sin reembolso: *"Usa paypal-sandbox: crea una factura de 250 USD para Hotel Central Plaza y envíala"* → *"Usa merchantpilot: ¿qué facturas tengo pendientes? Prepara recordatorios."*
 
 ---
 

@@ -48,7 +48,7 @@
 
 - Vista móvil del Action Center, estados de error y textos.
 - Página de inicio con capturas.
-- Pruebas con 2 o 3 personas reales, por ejemplo un pequeño comercio de Guatemala, para dar credibilidad a la historia de impacto.
+- Pruebas con 2 o 3 personas reales, por ejemplo una cafetería local, para dar credibilidad a la historia de impacto.
 
 **Semana 5 (31 oct – 6 nov): material de entrega**
 

@@ -80,7 +80,7 @@ services:
   #   runtime: docker
   #   image:
   #     url: docker.io/curlimages/curl:latest
-  #   schedule: "0 13 * * *"   # 07:00 in Guatemala (UTC-6)
+  #   schedule: "0 13 * * *"   # 13:00 UTC
   #   dockerCommand: sh -c 'curl -fsS -X POST https://merchantpilot.onrender.com/api/brief/send -H "Authorization: Bearer $CRON_SECRET"'
   #   envVars:
   #     - key: CRON_SECRET

@@ -144,7 +144,7 @@ npm run smoke -- https://merchantpilot.onrender.com
 - Instala el **Context Plugin de PayPal** en tu asistente de código (Claude Code, Cursor o VS Code).
 - Úsalo mientras programas y menciónalo en el README y en la entrega.
 
-## 8. Checklist de entrega en Devpost (12 de noviembre, 12:00 PM PT = 1:00 PM Guatemala)
+## 8. Checklist de entrega en Devpost (12 de noviembre, 12:00 PM PT)
 
 - [ ] URL pública funcionando (smoke test en verde)
 - [ ] Repo público con LICENSE y README en inglés

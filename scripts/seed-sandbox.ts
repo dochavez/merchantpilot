@@ -51,7 +51,7 @@ const COUNTRIES = [
   ['US', 'San Jose', 'CA', '95131', '2211 N First St'],
   ['US', 'Austin', 'TX', '78701', '500 Congress Ave'],
   ['MX', 'Ciudad de México', 'CMX', '06600', 'Av. Reforma 222'],
-  ['GT', 'Guatemala', 'GU', '01010', '6a Avenida 10-50'],
+  ['US', 'Miami', 'FL', '33131', '1001 Brickell Bay Dr'],
   ['CA', 'Toronto', 'ON', 'M5V 2T6', '100 King St W'],
 ] as const;
 
@@ -242,7 +242,7 @@ async function main() {
   const clients = [
     { name: 'Café Lumbre', email: 'sb-cafe-lumbre@example.com' },
     { name: 'Northside Roasters', email: 'sb-northside@example.com' },
-    { name: 'Hotel Antigua Central', email: 'sb-hotel-antigua@example.com' },
+    { name: 'Hotel Central Plaza', email: 'sb-hotel-central@example.com' },
     { name: 'Campus Coffee Co-op', email: 'sb-campus-coop@example.com' },
     { name: 'La Esquina Bakery', email: 'sb-esquina-bakery@example.com' },
     { name: 'Volcán Coworking', email: 'sb-volcan-cowork@example.com' },

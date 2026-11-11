@@ -12,6 +12,10 @@ Built for the [PayPal AI Hackathon 2026](https://paypalaihackathon.devpost.com).
 |---|---|---|
 | ![Approval card](public/screenshots/approval.png) | ![Portfolio](public/screenshots/portfolio.png) | ![Detail drawer](public/screenshots/drawer.png) |
 
+| Sales & customers | Disputes & refunds | Collections | Subscriptions |
+|---|---|---|---|
+| ![Sales](public/screenshots/sales.png) | ![Disputes](public/screenshots/risk.png) | ![Collections](public/screenshots/collections.png) | ![Subscriptions](public/screenshots/subscriptions.png) |
+
 ---
 
 ## The problem
@@ -97,6 +101,7 @@ With no keys, the app runs on demo data and the chat explains how to add a model
 - **Custom widget "Money at stake"** (`components/studio/MoneyAtStakeWidget.tsx`): maps any money measures through Studio's data engine (filters apply), shows the recoverable total with a stacked breakdown and a **"Recover it with AI"** button that hands the job to MerchantPilot. Registered in Studio's widget menu under *MerchantPilot* and described to Studio's own AI agents (`ai` metadata), so they can place it too.
 - **Custom widget "Recurring revenue"** (`components/studio/RecurringRevenueWidget.tsx`): MRR/ARR, subscribers, churn vs previous period, MRR at risk from failed renewals, renewals due and each plan's share, with *Recover at-risk MRR* / *Why are they cancelling?* buttons.
 - **Custom widget "Cash-flow forecast & what-if"** (`components/studio/CashflowForecastWidget.tsx`): AG Charts projection with an 80% band and scenario toggles.
+- **A five-page report** (`components/studio/initial-report.ts`) with a page tab bar: *Overview*, *Sales & customers* (date and button filters, treemap, sunburst, column+line combo, donut, stacked weekday chart, pivot grid), *Disputes & refunds* (nightingale, bar, radial gauge, stacked area, grid), *Collections* (aging columns, radial gauge, bar, treemap of invoiced products, grid) and *Subscriptions* (custom widget, donut, stacked columns, grid). The AI agent knows every page and points the merchant to it instead of duplicating charts.
 - **Drill-down cells**: grid columns tagged with `context.drill` render as links that open a detail drawer (invoice products and timeline, customer value, dispute evidence, subscription history).
 - **In-chat cards** via `aiToolDisplay`: Approve/Reject proposals and download reports inside Studio's AI panel.
 - **Brand theme** via `studioTheme.withParams(...)`: PayPal blues, Inter, chart palette, softer widgets.
@@ -151,6 +156,7 @@ Set `EXPORT_API_KEY` to protect the feed: Power BI / Excel then use **Basic** au
 6. Open the business name menu → **Portfolio overview** to compare the three demo businesses.
 7. Click **Reset demo** to start over.
 
+Demo story with the 8 simulated cases (Spanish): [`docs/CASO-DEMO.es.md`](docs/CASO-DEMO.es.md).
 Step-by-step test guide (Spanish): [`docs/GUIA-PRUEBAS.es.md`](docs/GUIA-PRUEBAS.es.md) – PayPal webhook, sandbox disputes, MCP Inspector / Claude Desktop, Power BI, multi-business.
 PayPal AI-Toolkit + MerchantPilot MCP side by side in Claude Code (Spanish): [`docs/GUIA-AI-TOOLKIT.es.md`](docs/GUIA-AI-TOOLKIT.es.md).
 

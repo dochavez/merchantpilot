@@ -228,8 +228,8 @@ Por cobrar vencido = CALCULATE(SUM(Invoices[Amount]), Invoices[DaysOverdue] > 0)
 ### 5.1 Ver la función con los negocios de demostración
 
 1. En el dashboard, haz clic en el **nombre del negocio** (arriba a la izquierda, con ▾).
-2. Verás tu negocio principal y dos negocios de demostración: **Altura Café Antigua** (cafetería, ventas bajando) y **Altura Barista Academy** (cursos en línea, con un pico de reembolsos).
-3. Elige **Altura Café Antigua**: todo el dashboard (tablas, KPIs, IA, exportaciones) cambia a ese negocio.
+2. Verás tu negocio principal y dos negocios de demostración: **Altura Coffee Shop** (cafetería, ventas bajando) y **Altura Barista Academy** (cursos en línea, con un pico de reembolsos).
+3. Elige **Altura Coffee Shop**: todo el dashboard (tablas, KPIs, IA, exportaciones) cambia a ese negocio.
 4. Abre de nuevo el menú → **Portfolio overview – compare all businesses**. Ahí verás:
    - totales consolidados (ventas, ingreso neto, dinero en riesgo, salud promedio);
    - el **Owner briefing** escrito por la IA (botón **Español** para traducirlo);
@@ -240,7 +240,7 @@ Por cobrar vencido = CALCULATE(SUM(Invoices[Amount]), Invoices[DaysOverdue] > 0)
 
 ### 5.2 Agregar un segundo negocio real (otra cuenta de PayPal sandbox)
 
-1. Developer Dashboard → **Testing Tools → Sandbox Accounts → Create account** → tipo **Business**, país Guatemala o Estados Unidos → **Create**.
+1. Developer Dashboard → **Testing Tools → Sandbox Accounts → Create account** → tipo **Business**, país Estados Unidos → **Create**.
 2. **Apps & Credentials → Create App**: nombre `merchantpilot-tienda2`, tipo **Merchant**. En **Sandbox Account** elige la cuenta Business del paso 1 → **Create App**.
 3. Copia el **Client ID** y el **Secret**.
 4. (Opcional, para tener datos) En PowerShell, dentro de la carpeta del proyecto:

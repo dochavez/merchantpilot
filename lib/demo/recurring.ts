@@ -49,7 +49,7 @@ const PLANS: Record<string, { subscribers: number; plans: Plan[]; suspended: num
 
 const FIRST = ['Ana', 'Luis', 'Maya', 'Noah', 'Sofía', 'Liam', 'Valeria', 'Ethan', 'Camila', 'Diego', 'Emma', 'Mateo', 'Olivia', 'Lucas', 'Isabella', 'Hugo', 'Chloe', 'Pablo', 'Grace', 'Iván', 'Elena', 'Tomás'];
 const LAST = ['García', 'Smith', 'Lopez', 'Chen', 'Martínez', 'Brown', 'Hernández', 'Müller', 'Rossi', 'Wilson', 'Pérez', 'Taylor', 'Ramírez', 'Clark', 'Morales', 'Evans'];
-const COUNTRIES = ['US', 'US', 'US', 'CA', 'MX', 'GT', 'GB', 'ES', 'DE', 'CO'];
+const COUNTRIES = ['US', 'US', 'US', 'CA', 'MX', 'CL', 'GB', 'ES', 'DE', 'CO'];
 const DAY = 86_400_000;
 const day = (d: Date) => d.toISOString().slice(0, 10);
 

@@ -16,7 +16,7 @@ interface StoredBusiness {
 }
 
 const DEMOS: Business[] = [
-  { id: 'cafe', name: 'Altura Café Antigua (demo)', kind: 'demo', profile: 'cafe', description: 'In-person café in Antigua Guatemala' },
+  { id: 'cafe', name: 'Altura Coffee Shop (demo)', kind: 'demo', profile: 'cafe', description: 'Neighbourhood coffee shop (in-store sales)' },
   { id: 'academy', name: 'Altura Barista Academy (demo)', kind: 'demo', profile: 'academy', description: 'Online barista courses (digital goods)' },
 ];
 

@@ -6,7 +6,7 @@
  * discover on its own:
  *   1. Refunds spike in the last ~10 days, concentrated on the "Ceramic Pour-Over Kit"
  *      (a damaged shipping batch).
- *   2. A cluster of ITEM_NOT_RECEIVED disputes from Mexico + Guatemala (a carrier problem).
+ *   2. A cluster of ITEM_NOT_RECEIVED disputes from Mexico + Colombia (a carrier problem).
  *   3. Three wholesale invoices are overdue, one by more than a month.
  *
  * Dates are anchored to `today` so the demo always looks current.
@@ -61,7 +61,7 @@ const SUPPLY_COUNTRIES = [
   { code: 'CA', weight: 10 },
   { code: 'GB', weight: 9 },
   { code: 'MX', weight: 11 },
-  { code: 'GT', weight: 8 },
+  { code: 'CO', weight: 8 },
   { code: 'DE', weight: 7 },
   { code: 'ES', weight: 7 },
 ] as const;
@@ -74,14 +74,14 @@ const SUPPLY_CLIENTS = [
   { name: 'Café Lumbre', email: 'pagos@cafelumbre.example' },
   { name: 'Northside Roasters', email: 'ap@northside.example' },
   { name: 'Bean & Leaf Bistro', email: 'billing@beanleaf.example' },
-  { name: 'Hotel Antigua Central', email: 'cuentas@hotelantigua.example' },
+  { name: 'Hotel Central Plaza', email: 'ap@hotelcentralplaza.example' },
   { name: 'Campus Coffee Co-op', email: 'treasurer@campuscoop.example' },
 ];
 
 /**
  * Demo business profiles. "supply" is the original online coffee-gear shop; the other two let the
  * multi-business portfolio show contrasting stories:
- *  - cafe:    an in-person café in Antigua Guatemala – many small tickets, sales slowly DECLINING,
+ *  - cafe:    a neighbourhood coffee shop (in-store sales) – many small tickets, sales slowly DECLINING,
  *             a card-testing / unauthorised-payment cluster, overdue catering invoices.
  *  - academy: online barista courses – digital goods, high tickets, refund spike on the bootcamp
  *             and unauthorised-transaction disputes concentrated in two countries.
@@ -123,7 +123,7 @@ export const DEMO_PROFILES: Record<string, DemoProfile> = {
     refundBase: 0.02,
     spikeProduct: 'Ceramic Pour-Over Kit',
     spikeRate: 0.45,
-    disputeCountries: ['MX', 'GT'],
+    disputeCountries: ['MX', 'CO'],
     disputeReason: 'MERCHANDISE_OR_SERVICE_NOT_RECEIVED',
     disputeMinPrice: 40,
     disputeRate: 0.18,
@@ -132,7 +132,7 @@ export const DEMO_PROFILES: Record<string, DemoProfile> = {
     forcedOverdue: [34, 12, 6],
   },
   cafe: {
-    merchant: 'Altura Café Antigua (demo)',
+    merchant: 'Altura Coffee Shop (demo)',
     seed: 7714,
     products: [
       { name: 'Espresso', price: 3, weight: 26 },
@@ -144,15 +144,15 @@ export const DEMO_PROFILES: Record<string, DemoProfile> = {
       { name: 'Event Catering Box', price: 85, weight: 1 },
     ],
     countries: [
-      { code: 'GT', weight: 78 },
-      { code: 'US', weight: 12 },
+      { code: 'US', weight: 78 },
+      { code: 'CA', weight: 12 },
       { code: 'MX', weight: 4 },
       { code: 'ES', weight: 3 },
-      { code: 'CA', weight: 3 },
+      { code: 'GB', weight: 3 },
     ],
     clients: [
       { name: 'Hotel Casa Santo Domingo', email: 'compras@casasantodomingo.example' },
-      { name: 'Antigua Language School', email: 'admin@antigualang.example' },
+      { name: 'Riverside Language School', email: 'admin@riversidelang.example' },
       { name: 'Volcán Tours', email: 'pagos@volcantours.example' },
       { name: 'Coworking La Merced', email: 'hola@lamerced.example' },
     ],
@@ -188,12 +188,12 @@ export const DEMO_PROFILES: Record<string, DemoProfile> = {
       { code: 'CO', weight: 12 },
       { code: 'BR', weight: 10 },
       { code: 'GB', weight: 8 },
-      { code: 'GT', weight: 8 },
+      { code: 'CL', weight: 8 },
     ],
     clients: [
       { name: 'Café Collective Bogotá', email: 'training@cafecollective.example' },
       { name: 'Roast & Co. Madrid', email: 'rrhh@roastco.example' },
-      { name: 'Hospitality Institute GT', email: 'finanzas@hospitalityinst.example' },
+      { name: 'Hospitality Institute', email: 'finance@hospitalityinst.example' },
     ],
     invoicePrefix: 'ACA',
     ordersBase: 11,
@@ -316,7 +316,7 @@ export function generateDemoDataset(opts: GenerateOptions = {}): Dataset {
         if (original) original.status = partial ? 'Partially refunded' : 'Completed';
       }
 
-      // ---- disputes: carrier problem to MX/GT in the last 16 days + a few historical ones
+      // ---- disputes: carrier problem to MX/CO in the last 16 days + a few historical ones
       const carrierIssue = P.disputeCountries.includes(country) && daysAgo >= 4 && daysAgo <= 16 && product.price >= P.disputeMinPrice;
       const disputeP = carrierIssue ? P.disputeRate : spike ? 0.06 : 0.0025;
       if (!pending && rand() < disputeP) {

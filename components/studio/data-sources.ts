@@ -5,8 +5,41 @@
 import type { Dataset } from '@/lib/types';
 
 const toDate = (s: string) => (s ? new Date(s + (s.length === 10 ? 'T00:00:00' : '')) : null);
+// Circled digits keep a natural order when charts sort categories alphabetically.
+const WEEKDAYS = ['⑦ Sun', '① Mon', '② Tue', '③ Wed', '④ Thu', '⑤ Fri', '⑥ Sat'];
+const REASONS: Record<string, string> = {
+  MERCHANDISE_OR_SERVICE_NOT_RECEIVED: 'Not received',
+  MERCHANDISE_OR_SERVICE_NOT_AS_DESCRIBED: 'Not as described',
+  UNAUTHORISED: 'Unauthorised',
+  CREDIT_NOT_PROCESSED: 'Credit not processed',
+  DUPLICATE_TRANSACTION: 'Duplicate',
+  INCORRECT_AMOUNT: 'Incorrect amount',
+  PAYMENT_BY_OTHER_MEANS: 'Paid by other means',
+  CANCELED_RECURRING_BILLING: 'Cancelled subscription',
+  PROBLEM_WITH_REMITTANCE: 'Remittance problem',
+  OTHER: 'Other',
+};
+const reasonLabel = (r: string) => REASONS[r] ?? r.replaceAll('_', ' ').toLowerCase();
+function agingBucket(i: { status: string; daysOverdue: number }) {
+  if (i.status === 'PAID' || i.status === 'MARKED_AS_PAID') return '① Paid';
+  if (i.daysOverdue <= 0) return '② Not due yet';
+  if (i.daysOverdue <= 15) return '③ 1-15 days late';
+  if (i.daysOverdue <= 30) return '④ 16-30 days late';
+  if (i.daysOverdue <= 60) return '⑤ 31-60 days late';
+  return '⑥ 60+ days late';
+}
 
 export function toStudioData(ds: Dataset) {
+  // First payment of each customer = "New", later ones = "Returning".
+  const seen = new Set<string>();
+  const customerType = new Map<string, string>();
+  for (const t of [...ds.transactions].sort((a, b) => a.datetime.localeCompare(b.datetime))) {
+    if (t.type !== 'Payment') continue;
+    const key = t.customerEmail || t.customerName;
+    customerType.set(t.transactionId, key && seen.has(key) ? 'Returning' : 'New');
+    if (key) seen.add(key);
+  }
+  const txCountry = new Map(ds.transactions.map((t) => [t.transactionId, t.country]));
   return {
     sources: [
       {
@@ -33,7 +66,9 @@ export function toStudioData(ds: Dataset) {
           chargebacks: t.type === 'Chargeback' ? -t.gross : 0,
           orders: t.type === 'Payment' ? 1 : 0,
           refundCount: t.type === 'Refund' ? 1 : 0,
-          saleType: t.type !== 'Payment' ? '' : t.subscriptionId ? 'Subscription' : t.invoiceId ? 'Invoice' : 'One-off',
+          saleType: t.type !== 'Payment' ? t.type : t.subscriptionId ? 'Subscription' : t.invoiceId ? 'Invoice' : 'One-off',
+          weekday: WEEKDAYS[new Date(t.datetime).getDay()],
+          customerType: customerType.get(t.transactionId) ?? '',
           subscriptionId: t.subscriptionId ?? '',
           recurringSales: t.type === 'Payment' && t.subscriptionId ? t.gross : 0,
         })),
@@ -57,7 +92,9 @@ export function toStudioData(ds: Dataset) {
           { id: 'chargebacks', name: 'Chargebacks', format: 'currencyFormat', description: 'Chargeback amount as a positive number' },
           { id: 'orders', name: 'Orders', format: 'integerFormat', description: '1 for each Payment row; sum = number of orders' },
           { id: 'refundCount', name: 'Refund count', format: 'integerFormat', description: '1 for each Refund row' },
-          { id: 'saleType', name: 'Sale type', format: 'textFormat', description: 'Subscription (recurring), Invoice or One-off for Payment rows' },
+          { id: 'saleType', name: 'Sale type', format: 'textFormat', description: 'Subscription (recurring), Invoice or One-off for sales; Refund, Chargeback, Transfer… for other rows' },
+          { id: 'weekday', name: 'Weekday', format: 'textFormat', description: 'Day of the week (① Mon … ⑦ Sun, numbered so it sorts Monday first)' },
+          { id: 'customerType', name: 'New vs returning', format: 'textFormat', description: 'New = first purchase of that customer, Returning = repeat purchase (Payment rows)' },
           { id: 'subscriptionId', name: 'Subscription ID', format: 'textFormat', context: { drill: 'subscription' } },
           { id: 'recurringSales', name: 'Recurring sales', format: 'currencyFormat', description: 'Gross amount of subscription payments only' },
         ],
@@ -81,6 +118,10 @@ export function toStudioData(ds: Dataset) {
           outcome: d.outcome ?? '',
           openAmount: d.status === 'RESOLVED' ? 0 : d.amount,
           isOpen: d.status === 'RESOLVED' ? 'Resolved' : 'Open',
+          reasonLabel: reasonLabel(d.reason),
+          country: txCountry.get(d.transactionId) ?? '',
+          openDaysToRespond: d.status === 'RESOLVED' ? null : d.daysToRespond,
+          disputes: 1,
         })),
         fields: [
           { id: 'disputeId', name: 'Dispute ID', format: 'textFormat', context: { drill: 'dispute' } },
@@ -97,6 +138,10 @@ export function toStudioData(ds: Dataset) {
           { id: 'outcome', name: 'Outcome', format: 'textFormat' },
           { id: 'openAmount', name: 'Open amount at risk', format: 'currencyFormat', description: 'Amount for unresolved disputes, 0 when resolved' },
           { id: 'isOpen', name: 'Open / Resolved', format: 'textFormat' },
+          { id: 'reasonLabel', name: 'Reason (short)', format: 'textFormat' },
+          { id: 'country', name: 'Buyer country', format: 'textFormat' },
+          { id: 'openDaysToRespond', name: 'Days left (open)', format: 'integerFormat', description: 'Days left to respond, only for open disputes (min = most urgent)' },
+          { id: 'disputes', name: 'Disputes', format: 'integerFormat', description: '1 per dispute; sum = number of disputes' },
         ],
       },
       {
@@ -116,6 +161,9 @@ export function toStudioData(ds: Dataset) {
           reminded: i.lastReminderAt ? 'Yes' : 'No',
           overdueAmount: i.daysOverdue > 0 ? i.amount : 0,
           items: i.itemsSummary ?? '',
+          aging: agingBucket(i),
+          overdueDays: i.daysOverdue > 0 ? i.daysOverdue : null,
+          invoices: 1,
           itemCount: (i.items ?? []).filter((l) => l.unitPrice > 0 && !/^Shipping/.test(l.name)).reduce((a, l) => a + l.quantity, 0),
         })),
         fields: [
@@ -132,6 +180,29 @@ export function toStudioData(ds: Dataset) {
           { id: 'overdueAmount', name: 'Overdue amount', format: 'currencyFormat', description: 'Invoice amount when overdue, else 0' },
           { id: 'items', name: 'Products', format: 'textFormat', description: 'Products and quantities on the invoice' },
           { id: 'itemCount', name: 'Units', format: 'integerFormat', description: 'Total product units on the invoice' },
+          { id: 'aging', name: 'Aging', format: 'textFormat', description: 'Paid, Not due yet, 1-15, 16-30, 31-60 or 60+ days late (numbered so it sorts in order)' },
+          { id: 'overdueDays', name: 'Days late (overdue only)', format: 'integerFormat', description: 'Days overdue, blank when not overdue (avg = average lateness)' },
+          { id: 'invoices', name: 'Invoices', format: 'integerFormat', description: '1 per invoice; sum = number of invoices' },
+        ],
+      },
+      {
+        id: 'invoiceLines',
+        name: 'PayPal invoice products',
+        description: 'One row per product line on each PayPal invoice (wholesale orders): product, quantity, line total and the invoice status.',
+        data: ds.invoices.flatMap((i) =>
+          (i.items ?? [])
+            .filter((l) => !/^(Shipping|Wholesale discount|Discount)/.test(l.name))
+            .map((l) => ({ invoiceNumber: i.invoiceNumber, customer: i.recipientName, product: l.name, quantity: l.quantity, total: l.total, status: i.status, aging: agingBucket(i), invoiceDate: toDate(i.invoiceDate) })),
+        ),
+        fields: [
+          { id: 'invoiceNumber', name: 'Invoice #', format: 'textFormat', context: { drill: 'invoice' } },
+          { id: 'customer', name: 'Customer', format: 'textFormat', context: { drill: 'customer' } },
+          { id: 'product', name: 'Product', format: 'textFormat' },
+          { id: 'quantity', name: 'Quantity', format: 'integerFormat' },
+          { id: 'total', name: 'Line total', format: 'currencyFormat' },
+          { id: 'status', name: 'Invoice status', format: 'textFormat' },
+          { id: 'aging', name: 'Aging', format: 'textFormat' },
+          { id: 'invoiceDate', name: 'Invoice date', format: 'dateFormat' },
         ],
       },
       {

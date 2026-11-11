@@ -22,6 +22,13 @@ try {
   await page.getByTestId('recurring-revenue').waitFor({ timeout: 30000 });
   if (!/MRR/.test(await page.getByTestId('recurring-revenue').innerText())) throw new Error('recurring revenue widget has no MRR');
 
+  // 0b. Report pages: tabs switch AG Studio pages
+  for (const id of ['sales', 'risk', 'collections', 'recurring', 'overview']) {
+    await page.getByTestId(`page-tab-${id}`).click();
+    if ((await page.getByTestId(`page-tab-${id}`).getAttribute('aria-selected')) !== 'true') throw new Error(`page tab ${id} not selected`);
+  }
+  await page.getByTestId('recurring-revenue').waitFor({ timeout: 15000 });
+
   // 1. Drill-down: click an invoice number in the grid → drawer → customer → back
   await page.getByTestId('drill-invoice').first().waitFor({ timeout: 30000 });
   await page.getByTestId('drill-invoice').first().click();
@@ -44,9 +51,9 @@ try {
 
   // 2. Switch business → café dashboard
   await page.getByTestId('business-switcher').click();
-  await page.getByRole('button', { name: /Altura Café Antigua/ }).click();
+  await page.getByRole('button', { name: /Altura Coffee Shop/ }).click();
   await page.waitForLoadState('networkidle');
-  await page.getByTestId('business-switcher').getByText('Altura Café Antigua').waitFor({ timeout: 20000 });
+  await page.getByTestId('business-switcher').getByText('Altura Coffee Shop').waitFor({ timeout: 20000 });
 
   // 3. Portfolio page
   await page.getByTestId('business-switcher').click();
@@ -56,6 +63,8 @@ try {
   if (cards !== 3) throw new Error(`expected 3 business cards, got ${cards}`);
   await page.locator('[data-testid="portfolio-grid"] .ag-row').first().waitFor();
   await page.locator('canvas').first().waitFor({ timeout: 15000 });
+  // The briefing loads after the cards: wait until it is no longer the placeholder.
+  await page.waitForFunction(() => !/Writing the briefing/.test(document.querySelector('[data-testid="portfolio-summary"]')?.textContent ?? 'Writing the briefing'), null, { timeout: 30000 });
   const summary = await page.getByTestId('portfolio-summary').innerText();
   if (summary.length < 40) throw new Error('portfolio briefing missing');
   const dl = await Promise.all([page.waitForEvent('download'), page.getByTestId('portfolio-pdf').click()]).then(([d]) => d);
@@ -72,7 +81,7 @@ try {
   await page.waitForLoadState('networkidle');
 
   if (errors.length) throw new Error('page errors: ' + errors.join(' | '));
-  console.log(`✔ tanda4 passed: recurring revenue widget, drill-down drawer (invoice products, subscription), business switcher, portfolio (3 cards, grid, chart, PDF), OData /all (${tx['@odata.count']} rows)`);
+  console.log(`✔ tanda4 passed: 5 report pages, recurring revenue widget, drill-down drawer (invoice products, subscription), business switcher, portfolio (3 cards, grid, chart, PDF), OData /all (${tx['@odata.count']} rows)`);
 } catch (e) {
   await page.screenshot({ path: 'e2e-failure.png' });
   console.error('✘ tanda4 failed:', e.message);
