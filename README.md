@@ -4,7 +4,7 @@
 
 Built for the [PayPal AI Hackathon 2026](https://paypalaihackathon.devpost.com).
 
-> **Live demo:** https://merchantpilot.onrender.com (no login, no setup, free to test) · **Video & submission:** [Devpost](https://devpost.com/software/merchanpilot) · **Judge quick start:** [below](#for-judges-how-to-test) and on the home page
+> **Live demo:** https://merchantpilot.onrender.com (no login, no setup, free to test) · **Video & submission:** [Devpost](https://devpost.com/software/merchanpilot) · **Judge quick start:** [below](#how-to-test) and on the home page
 
 ![MerchantPilot dashboard](public/screenshots/dashboard.png)
 
@@ -18,7 +18,7 @@ Built for the [PayPal AI Hackathon 2026](https://paypalaihackathon.devpost.com).
 
 ---
 
-## How to test the project that I build.
+## How to test
 
 **No account, login or API key is needed.** Open https://merchantpilot.onrender.com and click **Open the dashboard**. The hosted app already holds its PayPal sandbox and AI model keys on the server (they never reach the browser). It stays online (always-on Render instance) and free to use through the end of judging (December 15, 2026).
 
