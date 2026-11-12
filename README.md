@@ -4,7 +4,7 @@
 
 Built for the [PayPal AI Hackathon 2026](https://paypalaihackathon.devpost.com).
 
-> **Live demo:** https://merchantpilot.onrender.com (no login, no setup, free to test) · **Video:** `<YouTube link – add before submitting>` · **Judge quick start:** [below](#for-judges-how-to-test) and on the home page
+> **Live demo:** https://merchantpilot.onrender.com (no login, no setup, free to test) · **Video & submission:** [Devpost](https://devpost.com/software/merchanpilot) · **Judge quick start:** [below](#for-judges-how-to-test) and on the home page
 
 ![MerchantPilot dashboard](public/screenshots/dashboard.png)
 
@@ -42,7 +42,7 @@ Everything is sandbox or clearly labelled demo data. **No real money moves.**
 4. Business menu → **Portfolio overview**: health score and owner briefing for every business.
 5. **Export** → executive PDF, Excel or the Power BI feed.
 
-**Running it yourself:** see [Run locally](#run-locally). Without any keys it runs fully on demo data (`LLM_PROVIDER=mock` even runs the agent loop without an AI key). To use live data, create a free PayPal sandbox app at [developer.paypal.com](https://developer.paypal.com) → *Apps & Credentials* and put its Client ID/Secret in `.env.local`; `npm run seed:sandbox` fills it with payments, refunds and invoices. Sandbox buyer for checkout and subscription tests: `<sandbox personal account email / password – add before submitting>` (sandbox only, no real money).
+**Running it yourself:** see [Run locally](#run-locally). Without any keys it runs fully on demo data (`LLM_PROVIDER=mock` even runs the agent loop without an AI key). To use live data, create a free PayPal sandbox app at [developer.paypal.com](https://developer.paypal.com) → *Apps & Credentials* and put its Client ID/Secret in `.env.local`; `npm run seed:sandbox` fills it with payments, refunds and invoices. For checkout and subscription tests, use a sandbox *Personal* (buyer) account from the same dashboard (*Testing Tools → Sandbox accounts*); sandbox only, no real money.
 
 ## The problem
 
