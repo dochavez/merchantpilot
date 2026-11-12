@@ -21,22 +21,30 @@ function MoneyAtStakeWidget(params: AgWidgetParams) {
   const fields = ((dataMapping as Record<string, any>).values ?? []) as any[];
   const [parts, setParts] = useState<Part[] | null>(null);
   const [currency, setCurrency] = useState('USD');
+  const [retry, setRetry] = useState(0);
 
   useEffect(() => {
     let alive = true;
+    let settled = false;
     if (!fields.length) {
       widgetApi.setDisplayState('incompleteDataMapping');
       return;
     }
     widgetApi.setDisplayState('loading', { prominent: parts === null });
+    // Studio's data engine can drop a query issued while it is still starting up: ask again if
+    // nothing came back after a few seconds.
+    const watchdog = setTimeout(() => {
+      if (alive && !settled && retry < 5) setRetry((r) => r + 1);
+    }, 4000);
     void Promise.all(
       fields.map((f, i) =>
         widgetApi
-          .getData({ fields: [f] }, { queryId: `stake-${i}` })
+          .getData({ fields: [f] }, { queryId: `stake-${i}${retry ? `-r${retry}` : ""}` })
           .then((r) => ({ key: f.key, label: cleanLabel(widgetApi.getFieldName(f)), value: Number(r.results.rows?.[0]?.[f.key] ?? 0) || 0 }))
           .catch(() => ({ key: f.key, label: cleanLabel(widgetApi.getFieldName(f)), value: 0 })),
       ),
     ).then((res) => {
+      settled = true;
       if (!alive) return;
       setParts(res);
       const fmt = widgetApi.formatFieldValue(fields[0], 1) ?? '';
@@ -45,12 +53,13 @@ function MoneyAtStakeWidget(params: AgWidgetParams) {
     });
     return () => {
       alive = false;
+      clearTimeout(watchdog);
     };
     // Re-query whenever Studio hands us new params (data refresh, filters, mapping changes).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [params]);
+  }, [params, retry]);
 
-  if (!parts) return null;
+  if (!parts) return <div data-testid="money-at-stake-loading" style={{ padding: '4px 10px', fontSize: 12, color: '#64748B' }}>Calculating…</div>;
   const total = parts.reduce((s, p) => s + Math.max(0, p.value), 0);
   const money = (n: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency, maximumFractionDigits: 0 }).format(n);
   const ask = () => {

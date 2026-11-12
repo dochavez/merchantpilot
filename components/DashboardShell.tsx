@@ -11,6 +11,7 @@ import AlertsBell from './AlertsBell';
 import BusinessSwitcher from './BusinessSwitcher';
 import DetailDrawer from './DetailDrawer';
 import VoiceButton from './VoiceButton';
+import GuidedTour, { startTour } from './GuidedTour';
 import { ACTION_EXECUTED_EVENT } from './studio/actions-client';
 import { clearSavedDashboard } from './studio/StudioDashboard';
 
@@ -61,6 +62,16 @@ export default function DashboardShell() {
         </Link>
         {dataset && <BusinessSwitcher fallbackName={dataset.merchantName} live={dataset.mode === 'live'} />}
         <div className="ml-auto flex items-center gap-2">
+          <button
+            className="rounded-md border border-[var(--accent)] px-2.5 py-1 text-xs font-semibold text-[var(--accent)] hover:bg-[var(--hover)]"
+            onClick={() => {
+              setShowActions(true);
+              startTour();
+            }}
+            data-testid="start-tour"
+          >
+            ▶ Guided tour
+          </button>
           <VoiceButton />
           <AlertsBell />
           <BriefButton />
@@ -97,6 +108,7 @@ export default function DashboardShell() {
         )}
       </main>
       <DetailDrawer />
+      <GuidedTour dataset={dataset} />
     </div>
   );
 }

@@ -8,7 +8,7 @@ Historia única que usamos en la app, en el video y en la descripción de Devpos
 
 | Negocio en la app | Qué vende | Cómo cobra con PayPal |
 |---|---|---|
-| **Altura Coffee Supply** (principal) | Equipo de café y granos en línea; **Coffee Club** por suscripción; venta al por mayor a cafeterías y hoteles | Checkout de PayPal, **Subscriptions**, **Invoicing** |
+| **Altura Coffee Supply (demo)**, abre por defecto; tu sandbox real aparece aparte como *Live* | Equipo de café y granos en línea; **Coffee Club** por suscripción; venta al por mayor a cafeterías y hoteles | Checkout de PayPal, **Subscriptions**, **Invoicing** |
 | **Altura Coffee Shop** | La cafetería física: espresso, capuchino, desayunos, granos para llevar | Pagos con tarjeta y PayPal en tienda, **membresía** mensual de café |
 | **Altura Barista Academy** | Cursos de barista en línea y un bootcamp de negocio | Pagos únicos y **membresías** mensual y anual |
 

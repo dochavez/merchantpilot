@@ -41,5 +41,5 @@ async function GET_handler() {
   return new Response('MerchantPilot MCP endpoint: POST JSON-RPC here (Streamable HTTP, JSON responses).', { status: 405, headers: { Allow: 'POST' } });
 }
 
-export const POST = withBusiness(POST_handler);
-export const GET = withBusiness(GET_handler);
+export const POST = withBusiness(POST_handler, { fallback: 'primary' });
+export const GET = withBusiness(GET_handler, { fallback: 'primary' });

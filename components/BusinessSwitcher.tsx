@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import { selectBusiness, type BusinessInfo } from './business-client';
 
 const KIND: Record<BusinessInfo['kind'], string> = { primary: 'Main', demo: 'Demo', paypal: 'PayPal' };
+const kindLabel = (b: BusinessInfo) => (b.kind === 'primary' && b.description?.startsWith('Live') ? 'Live' : KIND[b.kind]);
 
 export default function BusinessSwitcher({ fallbackName, live }: { fallbackName?: string; live?: boolean }) {
   const [list, setList] = useState<BusinessInfo[]>([]);
@@ -21,6 +22,8 @@ export default function BusinessSwitcher({ fallbackName, live }: { fallbackName?
         setList(b.businesses);
         setCurrentId(b.currentId);
         setCanAdd(b.canAdd);
+        // Remember the server's default so every later request (and saved layout) uses the same business.
+        if (!/(?:^|;\s*)mp_business=/.test(document.cookie)) document.cookie = `mp_business=${encodeURIComponent(b.currentId)}; path=/; max-age=31536000; samesite=lax`;
       });
   useEffect(() => {
     void load();
@@ -48,7 +51,7 @@ export default function BusinessSwitcher({ fallbackName, live }: { fallbackName?
           <div className="my-1 border-t border-[var(--line)]" />
           {list.map((b) => (
             <button key={b.id} className={`flex w-full items-start gap-2 rounded-md px-3 py-2 text-left text-xs hover:bg-[var(--hover)] ${b.id === currentId ? 'bg-[var(--hover)]' : ''}`} onClick={() => selectBusiness(b.id)}>
-              <span className="mt-0.5 w-12 shrink-0 rounded bg-[var(--hover)] px-1 text-center text-[10px] font-semibold text-[var(--muted)]">{KIND[b.kind]}</span>
+              <span className="mt-0.5 w-12 shrink-0 rounded bg-[var(--hover)] px-1 text-center text-[10px] font-semibold text-[var(--muted)]">{kindLabel(b)}</span>
               <span className="min-w-0">
                 <b className="block truncate">{b.name}</b>
                 <span className="text-[var(--muted)]">{b.description}</span>

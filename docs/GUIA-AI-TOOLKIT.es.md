@@ -23,7 +23,7 @@ Tiempo: unos 30 minutos.
    ```
 4. Entra a tu carpeta y abre Claude Code:
    ```powershell
-   cd C:\Users\rudolf\Documents\PayPalMerchant\merchantpilot
+   cd C:\Users\<tu-usuario>\Documents\PayPalMerchant\merchantpilot
    claude
    ```
    La primera vez se abre el navegador para iniciar sesión: usa tu cuenta de Claude (el plan Pro sirve).
@@ -47,7 +47,7 @@ y después:
 Si el comando no encuentra el plugin, usa la instalación local: sal con `/exit` y en PowerShell:
 
 ```powershell
-cd C:\Users\rudolf\Documents\PayPalMerchant
+cd C:\Users\<tu-usuario>\Documents\PayPalMerchant
 git clone https://github.com/paypal/AI-Toolkit.git
 cd merchantpilot
 claude --plugin-dir ..\AI-Toolkit
@@ -107,7 +107,7 @@ Copia el texto largo que empieza con `A21AA…`.
 En PowerShell (fuera de Claude Code), dentro de la carpeta del proyecto, reemplaza `TU_MCP_API_KEY` por el valor de `MCP_API_KEY` en Render → Environment:
 
 ```powershell
-cd C:\Users\rudolf\Documents\PayPalMerchant\merchantpilot
+cd C:\Users\<tu-usuario>\Documents\PayPalMerchant\merchantpilot
 claude mcp add --transport http merchantpilot https://merchantpilot.onrender.com/api/mcp --header "Authorization: Bearer TU_MCP_API_KEY"
 ```
 
@@ -141,7 +141,7 @@ Guarda el resultado de `/paypal:doctor`; si encuentra algo, compártelo para cor
 
 ## Parte 6. La demo para los jueces (los dos MCP + alerta en vivo)
 
-Prepara: dashboard de MerchantPilot abierto en el navegador con el **negocio principal**, y Claude Code al lado. Graba la pantalla.
+Prepara: dashboard de MerchantPilot abierto en el navegador con el negocio *Live* (**Altura Coffee Supply (sandbox)**, en el menú de negocios), y Claude Code al lado. El MCP de MerchantPilot trabaja con ese mismo negocio por defecto. Graba la pantalla.
 
 1. **PayPal MCP ejecuta sin preguntar**
    > *Usa paypal-sandbox: reembolsa 79 USD de la captura 5UY00730991452152.*

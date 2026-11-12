@@ -19,12 +19,13 @@ import { cashflowForecastWidget } from './CashflowForecastWidget';
 import { recurringRevenueWidget } from './RecurringRevenueWidget';
 import { currentBusinessId } from '../business-client';
 import { makeDrillCell } from './DrillCell';
+import { GO_TO_PAGE_EVENT } from '../tour-events';
 
 const licenseKey = process.env.NEXT_PUBLIC_AG_STUDIO_LICENSE_KEY;
 if (licenseKey) AgStudioLicenseManager.setLicenseKey(licenseKey);
 
 const STUDIO_MODULES = [AgStudioAiModule];
-const STATE_BASE = 'merchantpilot.studioState.v5';
+const STATE_BASE = 'merchantpilot.studioState.v6';
 /** Each business keeps its own dashboard layout. */
 const stateKey = () => `${STATE_BASE}:${currentBusinessId()}`;
 
@@ -102,6 +103,13 @@ export default function StudioDashboard({ dataset, onApi }: StudioDashboardProps
     api.setState({ ...(api.getState() as any), selectedPageId: id });
     setPages((prev) => ({ ...prev, selected: id }));
   }, []);
+
+  // The guided tour switches report pages.
+  useEffect(() => {
+    const on = (e: Event) => goToPage(String((e as CustomEvent).detail ?? ''));
+    window.addEventListener(GO_TO_PAGE_EVENT, on);
+    return () => window.removeEventListener(GO_TO_PAGE_EVENT, on);
+  }, [goToPage]);
 
   const ai = useCallback((params: { api: AgStudioApi }) => buildHarness(params.api, adapter), [adapter]);
 

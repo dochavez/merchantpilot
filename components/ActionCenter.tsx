@@ -6,6 +6,7 @@ import { ACTIONS_CHANGED_EVENT } from './studio/paypal-agent';
 import { KIND_LABEL, STATUS_STYLE, fetchActions, money, setApprover, viaLabel } from './studio/actions-client';
 import ActionDecision, { useApprover } from './studio/ActionDecision';
 import RulesDialog from './RulesDialog';
+import { OPEN_RULES_EVENT } from './tour-events';
 
 export default function ActionCenter() {
   const [actions, setActions] = useState<ProposedAction[]>([]);
@@ -19,10 +20,13 @@ export default function ActionCenter() {
   useEffect(() => {
     void Promise.resolve().then(refresh); // async fetch; setState happens after await
     const on = () => refresh();
+    const openRules = () => setRules(true);
     window.addEventListener(ACTIONS_CHANGED_EVENT, on);
+    window.addEventListener(OPEN_RULES_EVENT, openRules);
     const t = setInterval(refresh, 15_000);
     return () => {
       window.removeEventListener(ACTIONS_CHANGED_EVENT, on);
+      window.removeEventListener(OPEN_RULES_EVENT, openRules);
       clearInterval(t);
     };
   }, [refresh]);

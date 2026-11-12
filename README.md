@@ -4,7 +4,7 @@
 
 Built for the [PayPal AI Hackathon 2026](https://paypalaihackathon.devpost.com).
 
-> **Live demo:** https://merchantpilot.onrender.com · **Video:** `<YouTube link – add before submitting>` · **Judge quick start:** on the home page
+> **Live demo:** https://merchantpilot.onrender.com (no login, no setup, free to test) · **Video:** `<YouTube link – add before submitting>` · **Judge quick start:** [below](#for-judges-how-to-test) and on the home page
 
 ![MerchantPilot dashboard](public/screenshots/dashboard.png)
 
@@ -18,13 +18,39 @@ Built for the [PayPal AI Hackathon 2026](https://paypalaihackathon.devpost.com).
 
 ---
 
+## For judges: how to test
+
+**No account, login or API key is needed.** Open https://merchantpilot.onrender.com and click **Open the dashboard**. The hosted app already holds its PayPal sandbox and AI model keys on the server (they never reach the browser). It stays online (always-on Render instance) and free to use through the end of judging (December 15, 2026).
+
+The business menu (top left) has two kinds of data:
+
+| Business | Data | What to try |
+|---|---|---|
+| **Altura Coffee Supply (demo)** – opens by default | Deterministic 90-day demo story: refund spike, carrier disputes, late wholesale invoices, Coffee Club churn and failed renewals | Every starter question in the AI panel; approve proposals; **Reset demo** restores the data at any time |
+| **Altura Coffee Supply (sandbox)** – label *Live* | The real **PayPal sandbox** account: Transaction Search, Disputes, Invoicing and Subscriptions APIs | Approved actions execute on the PayPal sandbox (refunds, invoice reminders, payment plans, dispute responses); signed webhooks raise 🔔 alerts |
+| **Altura Coffee Shop (demo)**, **Altura Barista Academy (demo)** | Two more demo businesses | **Portfolio overview** compares all of them |
+
+Everything is sandbox or clearly labelled demo data. **No real money moves.**
+
+**Easiest: the guided tour.** On the first visit the dashboard offers a 3-minute tour (also the **▶ Guided tour** button in the header, or https://merchantpilot.onrender.com/dashboard?tour=1). Each step has a one-click button that does the action for you (asks the AI, switches page, opens a drawer or the rules) and ticks itself off when you complete it, for example when you approve an action.
+
+**Or follow the same path yourself:**
+
+1. In the **AI Assistant** panel (right), click **"Why are refunds up?"**. The agent queries the data, explains the cause and asks AG Studio to add the chart that proves it.
+2. Click **"Chase overdue invoices"**. A card appears in the chat; press **Approve** and see it executed and logged in the **Action Center** audit trail.
+3. Use the page tabs (*Overview, Sales & customers, Disputes & refunds, Collections, Subscriptions*). Click any invoice number, customer or dispute in a grid to open its detail drawer.
+4. Business menu → **Portfolio overview**: health score and owner briefing for every business.
+5. **Export** → executive PDF, Excel or the Power BI feed.
+
+**Running it yourself:** see [Run locally](#run-locally). Without any keys it runs fully on demo data (`LLM_PROVIDER=mock` even runs the agent loop without an AI key). To use live data, create a free PayPal sandbox app at [developer.paypal.com](https://developer.paypal.com) → *Apps & Credentials* and put its Client ID/Secret in `.env.local`; `npm run seed:sandbox` fills it with payments, refunds and invoices. Sandbox buyer for checkout and subscription tests: `<sandbox personal account email / password – add before submitting>` (sandbox only, no real money).
+
 ## The problem
 
 Small merchants live inside PayPal but can't see *why* their money moves. Refunds creep up, disputes hit their deadlines unnoticed, and wholesale invoices go unpaid for weeks. The data exists in PayPal, but turning it into a decision takes an analyst they don't have.
 
 ## What it does
 
-1. **Ask** – "Why are my refunds up?" MerchantPilot reads transactions, disputes and invoices and runs deterministic anomaly detection. It finds, for example, that 54% of *Ceramic Pour-Over Kit* orders were refunded in the last 10 days, versus 2% before.
+1. **Ask** – "Why are my refunds up?" MerchantPilot reads transactions, disputes and invoices and runs deterministic anomaly detection. It finds, for example, that about 40% of *Ceramic Pour-Over Kit* orders were refunded in the last 10 days, versus under 2% before (a damaged batch).
 2. **See** – it delegates to **AG Studio's built-in agents**, which add the chart that proves the finding to the dashboard.
 3. **Approve** – it *proposes* actions such as refunding the affected buyers, reminding the café whose invoice is 34 days late, or accepting a lost-package dispute. Each proposal appears as a card with **Approve / Reject right inside the chat** (and in the **Action Center**). Nothing moves money until the merchant clicks *Approve*. Approved actions then execute through the **PayPal Agent Toolkit**.
 4. **Govern** – the merchant sets **approval rules** (⚖ Rules): auto-approve refunds up to a small amount or invoice reminders, require **two different approvers** above a threshold, and cap daily money out. The AI works inside the rules; every decision (who, when, which rule) lands in a persistent **audit trail** (Postgres).
@@ -36,6 +62,33 @@ Small merchants live inside PayPal but can't see *why* their money moves. Refund
 10. **Recurring revenue** – PayPal Subscriptions support: MRR/ARR, active subscribers, churn vs previous period, subscriptions suspended after failed renewals (MRR at risk), renewals due, per-plan breakdown; alerts from `BILLING.SUBSCRIPTION.*` webhooks; a `paypal_subscriptions` tool for the agent and MCP. Invoices carry product line items.
 11. **Drill down** – click any invoice number, customer, dispute or transaction in the dashboard grids to open a detail drawer: invoice timeline, customer segment / lifetime value / refunds, dispute context and evidence pack, related transactions, with one-click AI actions.
 12. **Share** – one click (or one sentence in the chat: *"send me this month's report"*) produces an **executive PDF** with an AI-written summary, an **Excel workbook** with every table ready for pivots, CSVs, or a **live OData feed for Power BI and Excel** that refreshes from PayPal.
+
+## Impact
+
+What MerchantPilot surfaces in the first minute on the demo business (Altura Coffee Supply, a one-owner coffee brand with no analyst):
+
+| Finding | Money involved | What the owner can do, after one click |
+|---|---|---|
+| Refund spike on one product (damaged batch): ~40% refunded vs <2% before | ~1,450 USD refunded in 10 days | See the proof chart, refund the affected buyers, stop selling the batch |
+| 3 overdue wholesale invoices (up to 34 days late) | ~4,860 USD | Send reminders or offer a PayPal payment plan |
+| 12 open disputes, 2 due within 5 days, most "not received" in two countries | ~890 USD at risk | Prioritize by deadline, submit an evidence pack |
+| 6 subscriptions suspended after failed renewals; churn up from 2% to 7% | ~310 USD/month MRR at risk | Ask subscribers to update their payment method |
+
+That is **about 5,750 USD of money at stake plus ~310 USD/month of recurring revenue**, found, explained and turned into ready-to-approve actions. Without the tool it means hours of exports and spreadsheets. (Demo figures are generated relative to today, so they move slightly from day to day.)
+
+Who it is for: the millions of small merchants who sell through PayPal (online shops, cafés, course creators, wholesalers) and make money decisions alone. The human-approval design makes it safe to let an AI act on real money: the AI prepares, the owner decides, the rules and audit trail keep it accountable.
+
+## AI tools used
+
+| Where | Tool | Role |
+|---|---|---|
+| In the product | **Anthropic Claude** (`claude-haiku-4-5` on the hosted demo; OpenAI models also supported) through the **Vercel AI SDK** | Powers the MerchantPilot agent: tool calling, explanations, executive summaries, owner briefings. The model in use is shown on the home page. |
+| In the product | **AG Studio Agent Framework** | The MerchantPilot agent delegates chart building to Studio's built-in agents (`delegate_to`). |
+| In the product | **PayPal Agent Toolkit** (`@paypal/agent-toolkit`) | Executes approved money-moving actions on PayPal. |
+| In the product | **MCP** (Model Context Protocol) | MerchantPilot is an MCP server, usable from Claude, Cursor or any MCP client. |
+| Development | **Claude (Anthropic)** as a coding assistant, plus the **PayPal AI-Toolkit** plugin and MCP server for sandbox work | Helped write and test code and docs; every change was reviewed, tested (unit + browser tests) and deployed by the author. |
+
+The AI never does arithmetic on raw data: numbers come from deterministic code (`lib/analytics.ts`), and the AI can only *propose* actions that a person approves.
 
 ## Architecture
 
@@ -60,7 +113,7 @@ PayPal webhooks (signature verified) ──────────────�
 * **Studio Agent Framework:** a custom agent (`directLlmRunner`) talks to Studio's built-in agents through `delegate_to`. A custom `AgLlmAdapter` proxies every model turn to the server, so no API key reaches the browser. See `components/studio/`.
 * **PayPal:**
   * Transaction Search, Disputes, Invoicing (with line items) and Subscriptions APIs feed the dashboard (`lib/paypal/live-data.ts`).
-  * Money-moving operations run only through `@paypal/agent-toolkit`, with least-privilege tool configuration (`lib/paypal/toolkit.ts`).
+  * Refunds, accepted disputes and invoice reminders run through `@paypal/agent-toolkit`, with least-privilege tool configuration (`lib/paypal/toolkit.ts`). The Toolkit has no operations for dispute evidence uploads or invoice partial-payment plans, so those two use the PayPal REST API directly, behind the same approval and rules.
   * Webhooks are signature-verified.
 * **Safety by design:**
   * The LLM never does arithmetic on raw rows. Tools return computed facts (`lib/analytics.ts`).
@@ -70,6 +123,7 @@ PayPal webhooks (signature verified) ──────────────�
 * **Two data modes:**
   * **live:** your PayPal sandbox account.
   * **demo:** deterministic 90-day datasets for three fictional businesses (coffee-gear shop, café, online academy) with built-in storylines: a refund spike, a carrier dispute cluster, overdue invoices, a subscription churn spike and failed renewals. Judges always see a working product, and *Reset demo* restores it.
+  * With PayPal keys set, the app opens the demo story first and lists the live sandbox account as its own business (`DEFAULT_BUSINESS=primary` opens the live one first).
 
 ## Tech stack
 
@@ -92,8 +146,8 @@ With no keys, the app runs on demo data and the chat explains how to add a model
 | `npm run sandbox:subscription` | Creates the Coffee Club product + 4 plans and a subscription a sandbox buyer approves (`-- --plan monthly`, `biweekly`, `office` or `trial`; `--cancel`, `--suspend`) |
 | `npm run sandbox:buyer-order` | One PayPal checkout a sandbox buyer pays or cancels (`-- --item grinder`, `--amount 0.01`, `--decline`) |
 | `npm run seed:sandbox` | Creates payments, refunds and overdue invoices in your PayPal sandbox (`-- --payments 100 --refunds 21 --invoices 30`; invoices only: `-- --payments 0 --invoices 30`) |
-| `npm test` | Unit tests (66): analytics, actions, LLM stream, toolkit, exports, forecast, alerts, MCP, multi-business isolation, portfolio, drill-down, Power BI feed, subscriptions |
-| `npm run e2e` | Browser test of the full agent → tool → Action Center → approve loop (also `e2e:exports`, `e2e:policies`, `e2e:tanda2`, `e2e:tanda3`, `e2e:tanda4`) |
+| `npm test` | Unit tests (67): analytics, actions, LLM stream, toolkit, exports, forecast, alerts, MCP, multi-business isolation, portfolio, drill-down, Power BI feed, subscriptions |
+| `npm run e2e` | Browser test of the full agent → tool → Action Center → approve loop (also `e2e:exports`, `e2e:policies`, `e2e:tanda2`, `e2e:tanda3`, `e2e:tanda4`, `e2e:tour`) |
 | `npm run smoke -- <url>` | Post-deploy check of a hosted instance |
 
 ## AG Studio extensions
@@ -148,13 +202,15 @@ Set `EXPORT_API_KEY` to protect the feed: Power BI / Excel then use **Basic** au
 
 ## Testing the judge flow
 
-1. Open `/dashboard` and use the **AI Assistant** panel.
+1. Open `/dashboard` (it opens *Altura Coffee Supply (demo)*) and use the **AI Assistant** panel.
 2. Click **"Why are refunds up?"**, then **"Chase overdue invoices"**.
 3. Approve a proposal **on its card in the chat** (or in the Action Center) and watch the dashboard update.
 4. Ask *"Make me a PDF report of this month"* or use **Export** → PDF / Excel / Power BI.
 5. Click an invoice number or customer in a grid to open the detail drawer.
-6. Open the business name menu → **Portfolio overview** to compare the three demo businesses.
-7. Click **Reset demo** to start over.
+6. Open the business name menu → **Portfolio overview** to compare every business.
+7. On a demo business, click **Reset demo** to start over. Switch to the *Live* business to see the real PayPal sandbox data.
+
+Optional material in Spanish (the author's language; not needed to test):
 
 Demo story with the 8 simulated cases (Spanish): [`docs/CASO-DEMO.es.md`](docs/CASO-DEMO.es.md).
 Step-by-step test guide (Spanish): [`docs/GUIA-PRUEBAS.es.md`](docs/GUIA-PRUEBAS.es.md) – PayPal webhook, sandbox disputes, MCP Inspector / Claude Desktop, Power BI, multi-business.

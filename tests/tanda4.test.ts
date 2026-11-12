@@ -46,6 +46,25 @@ describe('multi-business', () => {
     await runInBusiness(cafe, async () => invalidateDataset());
   });
 
+  it('with live PayPal keys, opens the demo story first and lists the live sandbox second', async () => {
+    const { defaultBusinessId } = await import('@/lib/businesses');
+    expect(defaultBusinessId()).toBe('primary');
+    vi.stubEnv('PAYPAL_CLIENT_ID', 'x');
+    vi.stubEnv('PAYPAL_CLIENT_SECRET', 'y');
+    try {
+      expect(defaultBusinessId()).toBe('supply');
+      expect((await listBusinesses()).map((b) => b.id)).toEqual(['supply', 'primary', 'cafe', 'academy']);
+      expect((await resolveBusiness(null)).id).toBe('supply');
+      expect((await resolveBusiness(null, 'primary')).id).toBe('primary');
+      vi.stubEnv('DEFAULT_BUSINESS', 'primary');
+      expect((await resolveBusiness(undefined)).id).toBe('primary');
+    } finally {
+      vi.stubEnv('PAYPAL_CLIENT_ID', '');
+      vi.stubEnv('PAYPAL_CLIENT_SECRET', '');
+      vi.stubEnv('DEFAULT_BUSINESS', '');
+    }
+  });
+
   it('falls back to the primary business for unknown ids', async () => {
     expect((await resolveBusiness('nope')).id).toBe('primary');
   });

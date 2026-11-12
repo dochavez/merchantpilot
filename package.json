@@ -24,6 +24,7 @@
     "sandbox:buyer-order": "tsx scripts/sandbox-buyer-order.ts",
     "e2e:tanda3": "node tests/e2e/tanda3.mjs",
     "e2e:tanda4": "node tests/e2e/tanda4.mjs",
+    "e2e:tour": "node tests/e2e/tour.mjs",
     "sandbox:subscription": "tsx scripts/sandbox-subscription.ts"
   },
   "dependencies": {

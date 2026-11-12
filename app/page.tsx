@@ -74,8 +74,11 @@ export default function Home() {
         <Pill ok={hasPayPalCredentials()} label="PayPal Agent Toolkit" />
       </div>
       <div className="mt-8 flex flex-wrap gap-3">
-        <Link href="/dashboard" className="rounded-lg bg-[var(--accent)] px-5 py-2.5 text-sm font-semibold text-white hover:opacity-90" data-testid="open-dashboard">
-          Open the dashboard →
+        <Link href="/dashboard?tour=1" className="rounded-lg bg-[var(--accent)] px-5 py-2.5 text-sm font-semibold text-white hover:opacity-90" data-testid="start-guided-tour">
+          ▶ Start the 3-minute guided tour
+        </Link>
+        <Link href="/dashboard" className="rounded-lg border border-[var(--line)] px-5 py-2.5 text-sm font-medium hover:bg-[var(--hover)]" data-testid="open-dashboard">
+          Open the dashboard
         </Link>
         <Link href="/portfolio" className="rounded-lg border border-[var(--line)] px-5 py-2.5 text-sm font-medium hover:bg-[var(--hover)]">
           Portfolio of businesses
@@ -149,6 +152,10 @@ export default function Home() {
 
       <section id="judges" className="mt-14 rounded-xl border border-[var(--line)] bg-[var(--panel)] p-6">
         <h2 className="text-lg font-semibold">Judge quick start (3 minutes)</h2>
+        <p className="mt-1 text-sm">
+          Easiest: <Link className="font-semibold text-[var(--accent)] underline" href="/dashboard?tour=1">start the guided tour</Link>. It walks you through every step below with one-click buttons. Or follow the steps yourself:
+        </p>
+        <p className="mt-1 text-sm text-[var(--muted)]">No login, no setup. The dashboard opens on the demo story of Altura Coffee Supply; the PayPal sandbox account is one click away.</p>
         <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm">
           <li>
             Open the <Link className="text-[var(--accent)] underline" href="/dashboard">dashboard</Link>. The AI Assistant is the panel to the right of the canvas.
@@ -159,7 +166,7 @@ export default function Home() {
           </li>
           <li>Click an invoice number or a customer in a table to open the detail drawer. In <b>Cash-flow forecast</b>, toggle the scenarios.</li>
           <li>
-            Open the business menu (top left) → <b>Portfolio overview</b> to compare three businesses, or try <b>“How is my recurring revenue?”</b>.
+            Open the business menu (top left) → <b>Portfolio overview</b> to compare every business, or try <b>“How is my recurring revenue?”</b>. The business labelled <b>Live</b> is the real PayPal sandbox account.
           </li>
           <li>
             <b>Export</b> → PDF executive report or Power BI feed. <b>Reset demo</b> restores the original data at any time.

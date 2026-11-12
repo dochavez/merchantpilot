@@ -30,6 +30,11 @@ services:
       # if your sandbox has little activity).
       - key: FORCE_DEMO
         value: "0"
+      # With PayPal keys, visitors open "Altura Coffee Supply (demo)" (the full demo story) first and
+      # the live sandbox business is one click away in the business menu. Set to "primary" to open
+      # the live sandbox first instead.
+      - key: DEFAULT_BUSINESS
+        sync: false
       # --- AI model (one of the two)
       - key: OPENAI_API_KEY
         sync: false
@@ -41,10 +46,12 @@ services:
       - key: LLM_MODEL
         value: claude-haiku-4-5
       # --- Abuse protection for the public demo
+      # Per visitor IP, and a global daily safety cap. Sized so judges are never blocked during
+      # judging (Dec 1-15); check your model provider balance covers it.
       - key: LLM_TURNS_PER_10_MIN
-        value: "30"
+        value: "60"
       - key: LLM_DAILY_TURN_CAP
-        value: "200"
+        value: "1500"
       # --- Persistence: audit trail, approval rules, reminder history survive redeploys
       - key: DATABASE_URL
         fromDatabase:

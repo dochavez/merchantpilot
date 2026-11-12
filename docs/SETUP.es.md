@@ -86,6 +86,7 @@ PayPal no permite que el vendedor cree disputas por API. Hay que hacerlo como co
 ### ¿Demo o live para los jueces?
 
 - **Live (sandbox):** demuestra integración real. Úsalo en el video para mostrar una aprobación ejecutándose en PayPal.
+- **Con llaves de PayPal (por defecto):** la URL abre primero **Altura Coffee Supply (demo)** y tu sandbox aparece como negocio *Live* en el menú. `DEFAULT_BUSINESS=primary` abre primero el sandbox.
 - **Demo (`FORCE_DEMO=1`):** la historia siempre es clara y se puede reiniciar con "Reset demo". Recomendado para la URL pública, a menos que tu sandbox tenga suficiente actividad.
 
 ## 3. Llave del modelo de IA (elige una)

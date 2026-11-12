@@ -65,7 +65,7 @@ Un webhook es un aviso que PayPal envía a MerchantPilot cada vez que pasa algo 
    ```
 2. Abre el enlace que aparece, entra con tu cuenta **Personal** del sandbox (Developer Dashboard → **Testing Tools → Sandbox Accounts** → la cuenta *Personal* → **View/edit account** para ver el correo y la contraseña) y pulsa **Pagar**.
 3. Llegarás a una página de example.com (es normal). La terminal dirá **Captured**.
-4. Abre `https://merchantpilot.onrender.com/dashboard` con el **negocio principal** seleccionado (los avisos de PayPal llegan a ese negocio). En unos 10 a 30 segundos la 🔔 muestra un número rojo; ábrela y verás **New sale $79.00 USD**.
+4. Abre `https://merchantpilot.onrender.com/dashboard` con el negocio **Altura Coffee Supply (sandbox)** seleccionado, el que tiene la etiqueta *Live* en el menú de negocios (los avisos de PayPal llegan a ese negocio). En unos 10 a 30 segundos la 🔔 muestra un número rojo; ábrela y verás **New sale $79.00 USD**.
 
 **Comprobación técnica:** abre `https://merchantpilot.onrender.com/api/webhooks/paypal` en el navegador. Verás los últimos eventos recibidos; deben decir `"verified": true`.
 
@@ -163,7 +163,7 @@ Hay dos direcciones:
 | Feed | URL | Úsalo para |
 |------|-----|-----------|
 | Todos los negocios (recomendado) | `https://merchantpilot.onrender.com/api/odata/all` | Comparar negocios. Todas las tablas traen `BusinessId` y `BusinessName`, más la tabla **Businesses** con la salud de cada uno |
-| Solo el negocio principal | `https://merchantpilot.onrender.com/api/odata` | Un solo negocio |
+| Solo el negocio que abre por defecto (la historia de demo) | `https://merchantpilot.onrender.com/api/odata` | Un solo negocio; agrega `?business=primary` para el sandbox *Live* |
 
 ### 4.1 Conectar (opción fácil: archivo .pbids)
 
@@ -228,7 +228,7 @@ Por cobrar vencido = CALCULATE(SUM(Invoices[Amount]), Invoices[DaysOverdue] > 0)
 ### 5.1 Ver la función con los negocios de demostración
 
 1. En el dashboard, haz clic en el **nombre del negocio** (arriba a la izquierda, con ▾).
-2. Verás tu negocio principal y dos negocios de demostración: **Altura Coffee Shop** (cafetería, ventas bajando) y **Altura Barista Academy** (cursos en línea, con un pico de reembolsos).
+2. Verás la historia de demo **Altura Coffee Supply (demo)**, tu sandbox *Live* y dos negocios de demostración más: **Altura Coffee Shop** (cafetería, ventas bajando) y **Altura Barista Academy** (cursos en línea, con un pico de reembolsos).
 3. Elige **Altura Coffee Shop**: todo el dashboard (tablas, KPIs, IA, exportaciones) cambia a ese negocio.
 4. Abre de nuevo el menú → **Portfolio overview – compare all businesses**. Ahí verás:
    - totales consolidados (ventas, ingreso neto, dinero en riesgo, salud promedio);
@@ -298,7 +298,7 @@ Resend es un servicio gratuito (100 correos al día) que permite que la app env�
 
 ## 9. Los 5 escenarios de PayPal ("Test the unhappy paths too")
 
-Haz cada escenario con el dashboard abierto en el **negocio principal** y anota el resultado. Cuenta Personal = comprador; cuenta Business = la tienda.
+Haz cada escenario con el dashboard abierto en el negocio *Live* (**Altura Coffee Supply (sandbox)**) y anota el resultado. Cuenta Personal = comprador; cuenta Business = la tienda.
 
 ### 01 · Pago exitoso (happy path)
 

@@ -24,7 +24,7 @@ const LAYOUT = { columns: 12, rowHeight: 56, widgetPadding: 8, minWidth: 520 };
 export const INITIAL_REPORT = {
   version: '3.0.0',
   selectedPageId: 'overview',
-  panels: { edit: { collapsed: true }, filters: { collapsed: true } },
+  panels: { data: { collapsed: true }, edit: { collapsed: true }, filters: { collapsed: true } },
   pages: [
     {
       id: 'overview',

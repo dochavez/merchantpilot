@@ -1,4 +1,4 @@
-import { addBusiness, businessIdFrom, listBusinesses, removeBusiness, resolveBusiness } from '@/lib/businesses';
+import { addBusiness, BUILT_IN_IDS, businessIdFrom, listBusinesses, removeBusiness, resolveBusiness } from '@/lib/businesses';
 import { canEncrypt } from '@/lib/crypto';
 
 export const dynamic = 'force-dynamic';
@@ -26,7 +26,7 @@ export async function POST(req: Request) {
 /** DELETE ?id= → removes an owner-added business (built-in ones can't be removed). */
 export async function DELETE(req: Request) {
   const id = new URL(req.url).searchParams.get('id');
-  if (!id || id === 'primary' || id === 'cafe' || id === 'academy') return Response.json({ error: 'This business cannot be removed' }, { status: 400 });
+  if (!id || BUILT_IN_IDS.includes(id)) return Response.json({ error: 'This business cannot be removed' }, { status: 400 });
   await removeBusiness(id);
   return Response.json({ ok: true });
 }
