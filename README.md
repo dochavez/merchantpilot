@@ -4,7 +4,7 @@
 
 Built for the [PayPal AI Hackathon 2026](https://paypalaihackathon.devpost.com).
 
-> **Live demo:** https://merchantpilot.onrender.com (no login, no setup, free to test) · **Video & submission:** [Devpost](https://devpost.com/software/merchanpilot) · **Judge quick start:** [below](#how-to-test) and on the home page
+> **Live demo:** https://merchantpilot.onrender.com (no login, no setup, free to test) · **Video:** [YouTube](https://youtu.be/Ntu2zmh_99g) · **Devpost:** [submission](https://devpost.com/software/merchanpilot) · **Judge quick start:** [below](#how-to-test) and on the home page
 
 ![MerchantPilot dashboard](public/screenshots/dashboard.png)
 
